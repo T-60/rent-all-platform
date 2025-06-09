@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { useProducts } from "@/contexts/products-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,9 +12,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { categories } from "@/lib/mock-data"
 import { Plus } from "lucide-react"
 import { ImageUpload } from "./image-upload"
+import { apiService } from "@/lib/api"
+
+const categories = [
+  { value: "electronics", label: "Electrónicos" },
+  { value: "vehicles", label: "Vehículos" },
+  { value: "tools", label: "Herramientas" },
+  { value: "furniture", label: "Muebles" },
+  { value: "sports", label: "Deportes" },
+  { value: "others", label: "Otros" }
+]
 
 interface AddProductFormProps {
   onClose: () => void
@@ -21,37 +31,129 @@ interface AddProductFormProps {
 
 export function AddProductForm({ onClose }: AddProductFormProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const { addProduct } = useAuth()
+  const { user } = useAuth()
   const { toast } = useToast()
-  const [imageData, setImageData] = useState<string | null>(null)
+  const { addProductToList, refreshProducts } = useProducts()
+  const [imageFiles, setImageFiles] = useState<File[]>([])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
 
-    const formData = new FormData(e.currentTarget)
-    const productData = {
-      name: formData.get("name") as string,
-      description: formData.get("description") as string,
-      price: Number(formData.get("price")),
-      priceUnit: "hour" as const,
-      category: formData.get("category") as string,
-      image: imageData || "/placeholder.svg?height=300&width=400",
-      pickupAddress: formData.get("pickupAddress") as string,
-      returnAddress: formData.get("returnAddress") as string,
-      paymentMethod: "efectivo" as const,
-      available: true,
+    try {
+      const formElement = e.currentTarget
+      const formData = new FormData()
+
+      // Obtener datos del formulario
+      const title = (formElement.elements.namedItem("title") as HTMLInputElement)?.value
+      const description = (formElement.elements.namedItem("description") as HTMLTextAreaElement)?.value
+      const pricePerDay = Number((formElement.elements.namedItem("pricePerDay") as HTMLInputElement)?.value)
+      const category = (formElement.elements.namedItem("category") as HTMLSelectElement)?.value
+      const pickupAddress = (formElement.elements.namedItem("pickupAddress") as HTMLInputElement)?.value
+      const returnAddress = (formElement.elements.namedItem("returnAddress") as HTMLInputElement)?.value
+
+      // Agregar campos al FormData
+      formData.append("title", title)
+      formData.append("description", description)
+      formData.append("pricePerDay", pricePerDay.toString())
+      formData.append("category", category)
+      formData.append("pickupAddress", pickupAddress)
+      formData.append("returnAddress", returnAddress)
+
+      // Agregar imágenes
+      imageFiles.forEach((file) => {
+        formData.append("images", file)
+      })
+
+      const response = await apiService.createProduct(formData)
+
+      // Agregar el producto al contexto global
+      if (response.product) {
+        addProductToList(response.product)
+      }
+
+      toast({
+        title: "🎉 ¡Producto publicado exitosamente!",
+        description: "Tu producto ya está visible para otros estudiantes. Recibirás notificaciones cuando alguien esté interesado en alquilarlo.",
+        duration: 6000,
+        className: "bg-green-50 border-green-200 text-green-800",
+      })
+
+      // Limpiar formulario
+      formElement.reset()
+      setImageFiles([])
+
+      // Actualizar la lista de productos en segundo plano
+      setTimeout(() => {
+        refreshProducts()
+      }, 1000)
+
+      onClose()
+    } catch (error: any) {
+      console.error("Error al crear producto:", error)
+      
+      // Manejo específico de errores mejorado
+      let errorTitle = "❌ Error al crear producto"
+      let errorDescription = "No se pudo crear el producto. Inténtalo de nuevo."
+      
+      if (error.response?.data) {
+        const errorData = error.response.data
+        
+        // Error de imágenes
+        if (errorData.error === 'NO_IMAGES') {
+          errorTitle = "📷 ¡Falta la imagen!"
+          errorDescription = "Tu producto necesita al menos una imagen para que otros estudiantes puedan verlo. Por favor, sube una foto."
+        }
+        // Errores de validación específicos
+        else if (errorData.errors && Array.isArray(errorData.errors)) {
+          const firstError = errorData.errors[0]
+          
+          if (firstError.field === 'title') {
+            errorTitle = "📝 Problema con el título"
+            errorDescription = firstError.message + " Usa un nombre descriptivo y corto."
+          } else if (firstError.field === 'description') {
+            errorTitle = "📄 Problema con la descripción"
+            errorDescription = firstError.message + " Describe bien tu producto para atraer más interesados."
+          } else if (firstError.field === 'pricePerDay') {
+            errorTitle = "💰 Problema con el precio"
+            errorDescription = firstError.message + " Verifica que sea un número válido."
+          } else if (firstError.field === 'pickupAddress' || firstError.field === 'returnAddress') {
+            errorTitle = "📍 Problema con las direcciones"
+            errorDescription = firstError.message + " Especifica direcciones claras y completas."
+          } else if (firstError.field === 'category') {
+            errorTitle = "🏷️ Problema con la categoría"
+            errorDescription = firstError.message
+          } else {
+            errorTitle = "📝 Información incompleta"
+            errorDescription = firstError.message
+          }
+          
+          // Agregar sugerencias si están disponibles
+          if (errorData.suggestions && errorData.suggestions.length > 0) {
+            errorDescription += "\n\n💡 Consejos:\n• " + errorData.suggestions.slice(0, 3).join("\n• ")
+          }
+        }
+        // Error con mensaje personalizado del servidor
+        else if (errorData.message) {
+          errorTitle = errorData.message.includes('❌') ? errorData.message : `❌ ${errorData.message}`
+          errorDescription = errorData.details || "Revisa la información e inténtalo de nuevo."
+        }
+      }
+      // Error de red o conexión
+      else if (error.code === 'NETWORK_ERROR' || !error.response) {
+        errorTitle = "🌐 Error de conexión"
+        errorDescription = "No se pudo conectar con el servidor. Verifica tu conexión a internet."
+      }
+      
+      toast({
+        title: errorTitle,
+        description: errorDescription,
+        variant: "destructive",
+        duration: 8000, // Más tiempo para leer el mensaje
+      })
+    } finally {
+      setIsLoading(false)
     }
-
-    addProduct(productData)
-
-    toast({
-      title: "¡Producto añadido!",
-      description: "Tu producto ha sido publicado exitosamente.",
-    })
-
-    setIsLoading(false)
-    onClose()
   }
 
   return (
@@ -69,15 +171,15 @@ export function AddProductForm({ onClose }: AddProductFormProps) {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Imagen del producto */}
           <div className="space-y-2">
-            <Label htmlFor="image">Foto del Producto</Label>
-            <ImageUpload onImageChange={setImageData} />
+            <Label htmlFor="image">Fotos del Producto</Label>
+            <ImageUpload onImageChange={(files) => setImageFiles(files)} />
           </div>
 
           {/* Información básica */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre del Producto</Label>
-              <Input id="name" name="name" placeholder="Ej: Cámara Canon EOS" required />
+              <Label htmlFor="title">Nombre del Producto</Label>
+              <Input id="title" name="title" placeholder="Ej: Cámara Canon EOS" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="category">Categoría</Label>
@@ -86,13 +188,11 @@ export function AddProductForm({ onClose }: AddProductFormProps) {
                   <SelectValue placeholder="Selecciona una categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories
-                    .filter((cat) => cat !== "Todos")
-                    .map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
+                  {categories.map((category) => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -112,8 +212,8 @@ export function AddProductForm({ onClose }: AddProductFormProps) {
 
           {/* Precio */}
           <div className="space-y-2">
-            <Label htmlFor="price">Precio por Hora (S/)</Label>
-            <Input id="price" name="price" type="number" min="1" step="0.01" placeholder="25.00" required />
+            <Label htmlFor="pricePerDay">Precio por Día (S/)</Label>
+            <Input id="pricePerDay" name="pricePerDay" type="number" min="1" step="0.01" placeholder="25.00" required />
             <p className="text-xs text-gray-500">Los pagos se realizarán únicamente en efectivo</p>
           </div>
 

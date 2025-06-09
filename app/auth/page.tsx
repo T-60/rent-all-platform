@@ -23,20 +23,29 @@ export default function AuthPage() {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
+    console.log('🔐 [AuthPage] Iniciando proceso de login...')
 
     const formData = new FormData(e.currentTarget)
     const email = formData.get("email") as string
     const password = formData.get("password") as string
 
-    const success = login(email, password)
+    console.log('📧 [AuthPage] Email:', email)
+    const success = await login(email, password)
+    console.log('📊 [AuthPage] Resultado del login:', success)
 
     if (success) {
+      console.log('✅ [AuthPage] Login exitoso, mostrando toast...')
       toast({
         title: "¡Bienvenido!",
         description: "Has iniciado sesión correctamente.",
       })
-      router.push("/dashboard")
+      console.log('🚀 [AuthPage] Redirigiendo al dashboard...')
+      // Agregar un pequeño delay para permitir que el estado se actualice
+      setTimeout(() => {
+        router.push("/dashboard")
+      }, 100)
     } else {
+      console.log('❌ [AuthPage] Login falló, mostrando error...')
       toast({
         title: "Error",
         description: "Email o contraseña incorrectos.",
@@ -50,6 +59,7 @@ export default function AuthPage() {
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
+    console.log('📝 [AuthPage] Iniciando proceso de registro...')
 
     const formData = new FormData(e.currentTarget)
     const name = formData.get("name") as string
@@ -58,7 +68,10 @@ export default function AuthPage() {
     const password = formData.get("password") as string
     const confirmPassword = formData.get("confirmPassword") as string
 
+    console.log('📧 [AuthPage] Datos de registro - Email:', email, 'Name:', name)
+
     if (password !== confirmPassword) {
+      console.log('❌ [AuthPage] Las contraseñas no coinciden')
       toast({
         title: "Error",
         description: "Las contraseñas no coinciden.",
@@ -68,18 +81,25 @@ export default function AuthPage() {
       return
     }
 
-    const success = register(name, email, university, password)
+    const success = await register(name, email, university, password)
+    console.log('📊 [AuthPage] Resultado del registro:', success)
 
     if (success) {
+      console.log('✅ [AuthPage] Registro exitoso, mostrando toast...')
       toast({
         title: "¡Registro exitoso!",
         description: "Tu cuenta ha sido creada correctamente.",
       })
-      router.push("/dashboard")
+      console.log('🚀 [AuthPage] Redirigiendo al dashboard...')
+      // Agregar un pequeño delay para permitir que el estado se actualice
+      setTimeout(() => {
+        router.push("/dashboard")
+      }, 100)
     } else {
+      console.log('❌ [AuthPage] Registro falló, mostrando error...')
       toast({
         title: "Error",
-        description: "El email ya está registrado.",
+        description: "Error al crear la cuenta. Intenta nuevamente.",
         variant: "destructive",
       })
     }

@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+node_modules/
+/.pnp
+.pnp.js
 
 # next.js
 /.next/
@@ -18,6 +21,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -25,3 +29,61 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backend specific
+backend/node_modules/
+backend/.env
+backend/uploads/products/*
+!backend/uploads/products/.gitkeep
+!backend/uploads/
+!backend/uploads/products/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+cookies.txt
+
+# Test and debug files
+test-*.js
+debug-*.js
+comprehensive-*.js
+*-test-*.js
+
+# Documentation drafts (keeping final documentation)
+CORRECCION-*.md
+ESTADO-*.md
+REPORTE-*.md
+SOLUCION-*.md
+VERIFICACION-*.md
+RESUMEN-*.md
+CORRECCIONES-*.md
+RESOLUCION-*.md
+
+# Backup files
+*-backup-*.tsx
+*-backup-*.ts
+*-backup-*.js
+
+# Development shell scripts (keeping essential ones)
+*.sh
+!verify-setup.sh
+!verify-profile-images.sh

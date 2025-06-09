@@ -11,9 +11,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { categories, type Product } from "@/lib/mock-data"
 import { ImageUpload } from "./image-upload"
 import { Edit } from "lucide-react"
+import { apiService, type Product } from "@/lib/api"
+
+const categories = [
+  { value: "electronics", label: "Electrónicos" },
+  { value: "vehicles", label: "Vehículos" },
+  { value: "tools", label: "Herramientas" },
+  { value: "furniture", label: "Muebles" },
+  { value: "sports", label: "Deportes" },
+  { value: "others", label: "Otros" }
+]
 
 interface EditProductFormProps {
   product: Product
@@ -22,34 +31,57 @@ interface EditProductFormProps {
 
 export function EditProductForm({ product, onClose }: EditProductFormProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const [imageData, setImageData] = useState<string | null>(product.image)
-  const { updateProduct } = useAuth()
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const { user } = useAuth()
   const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
 
-    const formData = new FormData(e.currentTarget)
-    const updates = {
-      name: formData.get("name") as string,
-      description: formData.get("description") as string,
-      price: Number(formData.get("price")),
-      category: formData.get("category") as string,
-      image: imageData || "/placeholder.svg?height=300&width=400",
-      pickupAddress: formData.get("pickupAddress") as string,
-      returnAddress: formData.get("returnAddress") as string,
+    try {
+      const formElement = e.currentTarget
+      const formData = new FormData()
+
+      // Obtener datos del formulario
+      const title = (formElement.elements.namedItem("title") as HTMLInputElement)?.value
+      const description = (formElement.elements.namedItem("description") as HTMLTextAreaElement)?.value
+      const pricePerDay = Number((formElement.elements.namedItem("pricePerDay") as HTMLInputElement)?.value)
+      const category = (formElement.elements.namedItem("category") as HTMLSelectElement)?.value
+      const pickupAddress = (formElement.elements.namedItem("pickupAddress") as HTMLInputElement)?.value
+      const returnAddress = (formElement.elements.namedItem("returnAddress") as HTMLInputElement)?.value
+
+      // Agregar campos al FormData
+      formData.append("title", title)
+      formData.append("description", description)
+      formData.append("pricePerDay", pricePerDay.toString())
+      formData.append("category", category)
+      formData.append("pickupAddress", pickupAddress)
+      formData.append("returnAddress", returnAddress)
+
+      // Agregar nuevas imágenes si las hay
+      imageFiles.forEach((file) => {
+        formData.append("images", file)
+      })
+
+      const response = await apiService.updateProduct(product._id, formData)
+
+      toast({
+        title: "¡Producto actualizado!",
+        description: "Los cambios han sido guardados exitosamente.",
+      })
+
+      onClose()
+    } catch (error) {
+      console.error("Error al actualizar producto:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el producto. Inténtalo de nuevo.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
-
-    updateProduct(product.id, updates)
-
-    toast({
-      title: "¡Producto actualizado!",
-      description: "Los cambios han sido guardados exitosamente.",
-    })
-
-    setIsLoading(false)
-    onClose()
   }
 
   return (
@@ -64,13 +96,16 @@ export function EditProductForm({ product, onClose }: EditProductFormProps) {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Imagen del producto */}
-          <ImageUpload onImageChange={setImageData} currentImage={product.image} />
+          <ImageUpload 
+            onImageChange={(files) => setImageFiles(files)} 
+            currentImages={product.images.map(img => `http://localhost:3001${img}`)} 
+          />
 
           {/* Información básica */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre del Producto</Label>
-              <Input id="name" name="name" defaultValue={product.name} required />
+              <Label htmlFor="title">Nombre del Producto</Label>
+              <Input id="title" name="title" defaultValue={product.title} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="category">Categoría</Label>
@@ -79,13 +114,11 @@ export function EditProductForm({ product, onClose }: EditProductFormProps) {
                   <SelectValue placeholder="Selecciona una categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories
-                    .filter((cat) => cat !== "Todos")
-                    .map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
+                  {categories.map((category) => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -99,8 +132,8 @@ export function EditProductForm({ product, onClose }: EditProductFormProps) {
 
           {/* Precio */}
           <div className="space-y-2">
-            <Label htmlFor="price">Precio por Hora (S/)</Label>
-            <Input id="price" name="price" type="number" min="1" step="0.01" defaultValue={product.price} required />
+            <Label htmlFor="pricePerDay">Precio por Día (S/)</Label>
+            <Input id="pricePerDay" name="pricePerDay" type="number" min="1" step="0.01" defaultValue={product.pricePerDay} required />
           </div>
 
           {/* Direcciones */}

@@ -3,15 +3,51 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import type { Notification, Product, RentalDetails } from "@/lib/mock-data"
-import { getInitialNotifications } from "@/lib/mock-data"
+import { apiService, type User as ApiUser, type AuthResponse } from "@/lib/api"
+
+// Define local types for backwards compatibility
+interface Notification {
+  id: string
+  title: string
+  message: string
+  read: boolean
+  timestamp: Date
+  type: "rental" | "system"
+}
+
+interface RentalDetails {
+  id: string
+  productId: string
+  productName: string
+  hours: number
+  totalPrice: number
+  pickupDate: string
+  pickupTime: string
+  pickupAddress: string
+  returnAddress: string
+  rentalDate: Date
+  status: "active" | "completed" | "cancelled"
+}
+
+const getInitialNotifications = (): Notification[] => [
+  {
+    id: "welcome",
+    title: "¡Bienvenido a RentAll!",
+    message: "Empieza explorando productos disponibles o publica los tuyos.",
+    read: false,
+    timestamp: new Date(),
+    type: "system",
+  },
+]
 
 interface User {
   id: string
   name: string
   email: string
-  university: string
-  password: string
+  phone?: string
+  role?: string
+  avatar?: string
+  university?: string
   rentedProducts: string[]
   ownedProducts: string[]
   rentalHistory: RentalDetails[]
@@ -19,11 +55,9 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  users: User[]
   notifications: Notification[]
-  userProducts: Product[]
-  login: (email: string, password: string) => boolean
-  register: (name: string, email: string, university: string, password: string) => boolean
+  login: (email: string, password: string) => Promise<boolean>
+  register: (name: string, email: string, university: string, password: string) => Promise<boolean>
   logout: () => void
   rentProduct: (
     productId: string,
@@ -35,105 +69,195 @@ interface AuthContextType {
     returnAddress: string,
     pricePerHour: number,
   ) => void
-  addProduct: (product: Omit<Product, "id" | "ownerId" | "createdAt">) => void
   markNotificationAsRead: (notificationId: string) => void
   markAllNotificationsAsRead: () => void
   isAuthenticated: boolean
-  updateProduct: (productId: string, updates: Partial<Product>) => void
-  deleteProduct: (productId: string) => void
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [users, setUsers] = useState<User[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [userProducts, setUserProducts] = useState<Product[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
+  console.log('🏗️ [AuthProvider] Inicializando - user:', user, 'isLoading:', isLoading)
+
   useEffect(() => {
-    // Cargar usuarios y sesión desde localStorage
-    const savedUsers = localStorage.getItem("rent-all-users")
-    const savedSession = localStorage.getItem("rent-all-session")
-    const savedUserProducts = localStorage.getItem("rent-all-user-products")
+    const initializeAuth = async () => {
+      console.log('🔄 [AuthProvider] Inicializando autenticación...')
+      // Verificar si existe un token guardado
+      const token = localStorage.getItem("token");
+      const savedSession = localStorage.getItem("rent-all-session");
 
-    if (savedUsers) {
-      setUsers(JSON.parse(savedUsers))
-    }
+      console.log('🔍 [AuthProvider] Token en localStorage:', token ? 'EXISTS' : 'NULL')
+      console.log('🔍 [AuthProvider] Sesión en localStorage:', savedSession ? 'EXISTS' : 'NULL')
 
-    if (savedSession) {
-      const sessionUser = JSON.parse(savedSession)
-      setUser(sessionUser)
-    }
-
-    if (savedUserProducts) {
-      setUserProducts(JSON.parse(savedUserProducts))
-    }
-  }, [])
-
-  const login = (email: string, password: string): boolean => {
-    const foundUser = users.find((u) => u.email === email && u.password === password)
-    if (foundUser) {
-      setUser(foundUser)
-      localStorage.setItem("rent-all-session", JSON.stringify(foundUser))
-
-      // Cargar notificaciones del usuario o crear las iniciales
-      const userNotificationsKey = `rent-all-notifications-${foundUser.id}`
-      const savedUserNotifications = localStorage.getItem(userNotificationsKey)
-
-      if (savedUserNotifications) {
-        const userNotifications = JSON.parse(savedUserNotifications).map((n: any) => ({
-          ...n,
-          timestamp: new Date(n.timestamp),
-        }))
-        setNotifications(userNotifications)
-      } else {
-        // Primera vez que inicia sesión, crear notificación de bienvenida
-        const initialNotifications = getInitialNotifications()
-        setNotifications(initialNotifications)
-        localStorage.setItem(userNotificationsKey, JSON.stringify(initialNotifications))
+      if (token && savedSession) {
+        try {
+          console.log('✅ [AuthProvider] Token y sesión encontrados, verificando...')
+          // Verificar si el token es válido obteniendo el perfil
+          const response = await apiService.getProfile();
+          if (response.user) {
+            console.log('✅ [AuthProvider] Token válido, restaurando sesión...')
+            // Adaptar el usuario de la API al formato local
+            const sessionUser = JSON.parse(savedSession);
+            setUser(sessionUser);
+            console.log('👤 [AuthProvider] Usuario restaurado:', sessionUser)
+            
+            // Cargar notificaciones del usuario
+            const userNotificationsKey = `rent-all-notifications-${sessionUser.id}`;
+            const savedUserNotifications = localStorage.getItem(userNotificationsKey);
+            
+            if (savedUserNotifications) {
+              const userNotifications = JSON.parse(savedUserNotifications).map((n: any) => ({
+                ...n,
+                timestamp: new Date(n.timestamp),
+              }));
+              setNotifications(userNotifications);
+            }
+          }
+        } catch (error) {
+          console.error("Error verificando token:", error);
+          // Token inválido, limpiar localStorage
+          localStorage.removeItem("token");
+          localStorage.removeItem("rent-all-session");
+        }
       }
+      
+      setIsLoading(false);
+    };
 
-      return true
+    initializeAuth();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      console.log('🔐 [AuthContext] Iniciando login para:', email);
+      const response: AuthResponse = await apiService.login({ email, password });
+      console.log('📡 [AuthContext] Respuesta del login:', response);
+      
+      if (response.token && response.user) {
+        console.log('✅ [AuthContext] Token y usuario recibidos correctamente');
+        // Guardar token en localStorage
+        localStorage.setItem("token", response.token);
+        console.log('💾 [AuthContext] Token guardado en localStorage');
+        
+        // Adaptar el usuario de la API al formato local
+        const adaptedUser: User = {
+          id: response.user.id,
+          name: response.user.name,
+          email: response.user.email,
+          phone: response.user.phone,
+          role: response.user.role,
+          avatar: response.user.avatar,
+          university: response.user.university || '',
+          rentedProducts: [],
+          ownedProducts: [],
+          rentalHistory: [],
+        };
+        
+        console.log('👤 [AuthContext] Usuario adaptado:', adaptedUser);
+        setUser(adaptedUser);
+        localStorage.setItem("rent-all-session", JSON.stringify(adaptedUser));
+        console.log('💾 [AuthContext] Sesión guardada en localStorage');
+
+        // Forzar una actualización del estado
+        setTimeout(() => {
+          console.log('🔄 [AuthContext] Estado forzadamente actualizado');
+        }, 50);
+
+        // Cargar notificaciones del usuario o crear las iniciales
+        const userNotificationsKey = `rent-all-notifications-${adaptedUser.id}`;
+        const savedUserNotifications = localStorage.getItem(userNotificationsKey);
+
+        if (savedUserNotifications) {
+          const userNotifications = JSON.parse(savedUserNotifications).map((n: any) => ({
+            ...n,
+            timestamp: new Date(n.timestamp),
+          }));
+          setNotifications(userNotifications);
+        } else {
+          // Primera vez que inicia sesión, crear notificación de bienvenida
+          const initialNotifications = getInitialNotifications();
+          setNotifications(initialNotifications);
+          localStorage.setItem(userNotificationsKey, JSON.stringify(initialNotifications));
+        }
+
+        console.log('✅ [AuthContext] Login completado exitosamente');
+        return true;
+      }
+      console.log('❌ [AuthContext] No se recibió token o usuario');
+      return false;
+    } catch (error) {
+      console.error("❌ [AuthContext] Error en login:", error);
+      return false;
     }
-    return false
-  }
+  };
 
-  const register = (name: string, email: string, university: string, password: string): boolean => {
-    if (users.find((u) => u.email === email)) {
-      return false // Usuario ya existe
+  const register = async (name: string, email: string, university: string, password: string): Promise<boolean> => {
+    try {
+      console.log('📝 [AuthContext] Iniciando registro para:', email);
+      const response: AuthResponse = await apiService.register({
+        name,
+        email,
+        password,
+        university,
+      });
+      console.log('📡 [AuthContext] Respuesta del registro:', response);
+      
+      if (response.token && response.user) {
+        console.log('✅ [AuthContext] Token y usuario recibidos correctamente en registro');
+        // Guardar token en localStorage
+        localStorage.setItem("token", response.token);
+        console.log('💾 [AuthContext] Token guardado en localStorage');
+        
+        // Adaptar el usuario de la API al formato local
+        const adaptedUser: User = {
+          id: response.user.id,
+          name: response.user.name,
+          email: response.user.email,
+          phone: response.user.phone,
+          role: response.user.role,
+          avatar: response.user.avatar,
+          university: response.user.university || university,
+          rentedProducts: [],
+          ownedProducts: [],
+          rentalHistory: [],
+        };
+
+        console.log('👤 [AuthContext] Usuario adaptado en registro:', adaptedUser);
+        setUser(adaptedUser);
+        localStorage.setItem("rent-all-session", JSON.stringify(adaptedUser));
+        console.log('💾 [AuthContext] Sesión guardada en localStorage');
+
+        // Forzar una actualización del estado
+        setTimeout(() => {
+          console.log('🔄 [AuthContext] Estado forzadamente actualizado en registro');
+        }, 50);
+
+        // Crear notificaciones iniciales para el nuevo usuario
+        const initialNotifications = getInitialNotifications();
+        setNotifications(initialNotifications);
+        localStorage.setItem(`rent-all-notifications-${adaptedUser.id}`, JSON.stringify(initialNotifications));
+
+        console.log('✅ [AuthContext] Registro completado exitosamente');
+        return true;
+      }
+      console.log('❌ [AuthContext] No se recibió token o usuario en registro');
+      return false;
+    } catch (error) {
+      console.error("❌ [AuthContext] Error en registro:", error);
+      return false;
     }
-
-    const newUser: User = {
-      id: Date.now().toString(),
-      name,
-      email,
-      university,
-      password,
-      rentedProducts: [],
-      ownedProducts: [],
-      rentalHistory: [],
-    }
-
-    const updatedUsers = [...users, newUser]
-    setUsers(updatedUsers)
-    localStorage.setItem("rent-all-users", JSON.stringify(updatedUsers))
-
-    setUser(newUser)
-    localStorage.setItem("rent-all-session", JSON.stringify(newUser))
-
-    // Crear notificaciones iniciales para el nuevo usuario
-    const initialNotifications = getInitialNotifications()
-    setNotifications(initialNotifications)
-    localStorage.setItem(`rent-all-notifications-${newUser.id}`, JSON.stringify(initialNotifications))
-
-    return true
-  }
+  };
 
   const logout = () => {
     setUser(null)
     setNotifications([])
+    localStorage.removeItem("token")
     localStorage.removeItem("rent-all-session")
     router.push("/auth")
   }
@@ -173,11 +297,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(updatedUser)
       localStorage.setItem("rent-all-session", JSON.stringify(updatedUser))
 
-      // Actualizar en la lista de usuarios
-      const updatedUsers = users.map((u) => (u.id === user.id ? updatedUser : u))
-      setUsers(updatedUsers)
-      localStorage.setItem("rent-all-users", JSON.stringify(updatedUsers))
-
       // Crear notificación de alquiler
       const rentalNotification: Notification = {
         id: `rental-${Date.now()}`,
@@ -189,50 +308,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const updatedNotifications = [rentalNotification, ...notifications]
-      setNotifications(updatedNotifications)
-      localStorage.setItem(`rent-all-notifications-${user.id}`, JSON.stringify(updatedNotifications))
-    }
-  }
-
-  const addProduct = (productData: Omit<Product, "id" | "ownerId" | "createdAt">) => {
-    if (user) {
-      const newProduct: Product = {
-        ...productData,
-        id: `user-product-${Date.now()}`,
-        ownerId: user.id,
-        createdAt: new Date(),
-        owner: user.name,
-        university: user.university,
-      }
-
-      const updatedUserProducts = [...userProducts, newProduct]
-      setUserProducts(updatedUserProducts)
-      localStorage.setItem("rent-all-user-products", JSON.stringify(updatedUserProducts))
-
-      // Actualizar usuario con producto añadido
-      const updatedUser = {
-        ...user,
-        ownedProducts: [...user.ownedProducts, newProduct.id],
-      }
-      setUser(updatedUser)
-      localStorage.setItem("rent-all-session", JSON.stringify(updatedUser))
-
-      // Actualizar en la lista de usuarios
-      const updatedUsers = users.map((u) => (u.id === user.id ? updatedUser : u))
-      setUsers(updatedUsers)
-      localStorage.setItem("rent-all-users", JSON.stringify(updatedUsers))
-
-      // Crear notificación
-      const productNotification: Notification = {
-        id: `product-${Date.now()}`,
-        title: "¡Producto añadido!",
-        message: `Tu producto "${newProduct.name}" ha sido publicado exitosamente.`,
-        read: false,
-        timestamp: new Date(),
-        type: "system",
-      }
-
-      const updatedNotifications = [productNotification, ...notifications]
       setNotifications(updatedNotifications)
       localStorage.setItem(`rent-all-notifications-${user.id}`, JSON.stringify(updatedNotifications))
     }
@@ -254,83 +329,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const updateProduct = (productId: string, updates: Partial<Product>) => {
-    if (user) {
-      const updatedUserProducts = userProducts.map((product) =>
-        product.id === productId ? { ...product, ...updates } : product,
-      )
-      setUserProducts(updatedUserProducts)
-      localStorage.setItem("rent-all-user-products", JSON.stringify(updatedUserProducts))
-
-      // Crear notificación
-      const updateNotification: Notification = {
-        id: `update-${Date.now()}`,
-        title: "Producto actualizado",
-        message: `Tu producto "${updates.name || "producto"}" ha sido actualizado exitosamente.`,
-        read: false,
-        timestamp: new Date(),
-        type: "system",
-      }
-
-      const updatedNotifications = [updateNotification, ...notifications]
-      setNotifications(updatedNotifications)
-      localStorage.setItem(`rent-all-notifications-${user.id}`, JSON.stringify(updatedNotifications))
-    }
-  }
-
-  const deleteProduct = (productId: string) => {
-    if (user) {
-      const productToDelete = userProducts.find((p) => p.id === productId)
-      const updatedUserProducts = userProducts.filter((product) => product.id !== productId)
-      setUserProducts(updatedUserProducts)
-      localStorage.setItem("rent-all-user-products", JSON.stringify(updatedUserProducts))
-
-      // Actualizar usuario
-      const updatedUser = {
-        ...user,
-        ownedProducts: user.ownedProducts.filter((id) => id !== productId),
-      }
-      setUser(updatedUser)
-      localStorage.setItem("rent-all-session", JSON.stringify(updatedUser))
-
-      // Actualizar en la lista de usuarios
-      const updatedUsers = users.map((u) => (u.id === user.id ? updatedUser : u))
-      setUsers(updatedUsers)
-      localStorage.setItem("rent-all-users", JSON.stringify(updatedUsers))
-
-      // Crear notificación
-      const deleteNotification: Notification = {
-        id: `delete-${Date.now()}`,
-        title: "Producto eliminado",
-        message: `Tu producto "${productToDelete?.name || "producto"}" ha sido eliminado exitosamente.`,
-        read: false,
-        timestamp: new Date(),
-        type: "system",
-      }
-
-      const updatedNotifications = [deleteNotification, ...notifications]
-      setNotifications(updatedNotifications)
-      localStorage.setItem(`rent-all-notifications-${user.id}`, JSON.stringify(updatedNotifications))
-    }
-  }
-
   return (
     <AuthContext.Provider
       value={{
         user,
-        users,
         notifications,
-        userProducts,
         login,
         register,
         logout,
         rentProduct,
-        addProduct,
         markNotificationAsRead,
         markAllNotificationsAsRead,
         isAuthenticated: !!user,
-        updateProduct,
-        deleteProduct,
+        isLoading,
       }}
     >
       {children}
