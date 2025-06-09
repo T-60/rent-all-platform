@@ -2,8 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { DirectImage } from "./direct-image"
-import { SimpleSmartImage } from "./simple-smart-image"
+import { SmartImage } from "./smart-image"
 import type { Product } from "@/lib/api"
 import { translateCategory } from "@/lib/utils-api"
 
@@ -11,12 +10,12 @@ interface ProductCardProps {
   product: Product
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCardImproved({ product }: ProductCardProps) {
   const firstImagePath = product.images && product.images.length > 0 
     ? product.images[0] 
     : undefined;
   
-  console.log(`🖼️ [ProductCard-Improved] ${product.title}:`, {
+  console.log(`🖼️ [ProductCardImproved] ${product.title}:`, {
     hasImages: product.images?.length > 0,
     firstImagePath,
     totalImages: product.images?.length || 0
@@ -25,7 +24,7 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <div className="aspect-video relative bg-gray-100">
-        <SimpleSmartImage
+        <SmartImage
           imagePath={firstImagePath}
           alt={product.title}
           className="w-full h-full object-cover"

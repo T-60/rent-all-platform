@@ -2,33 +2,39 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { DirectImage } from "./direct-image"
-import { SimpleSmartImage } from "./simple-smart-image"
 import type { Product } from "@/lib/api"
-import { translateCategory } from "@/lib/utils-api"
+import { translateCategory, getImageUrl } from "@/lib/utils-api"
 
 interface ProductCardProps {
   product: Product
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCardDirect({ product }: ProductCardProps) {
   const firstImagePath = product.images && product.images.length > 0 
     ? product.images[0] 
     : undefined;
+    
+  const imageUrl = firstImagePath ? getImageUrl(firstImagePath) : '/placeholder-product.svg';
   
-  console.log(`🖼️ [ProductCard-Improved] ${product.title}:`, {
+  console.log(`🖼️ [ProductCard-Direct] ${product.title}:`, {
     hasImages: product.images?.length > 0,
     firstImagePath,
+    imageUrl,
     totalImages: product.images?.length || 0
   });
   
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <div className="aspect-video relative bg-gray-100">
-        <SimpleSmartImage
-          imagePath={firstImagePath}
+        <img
+          src={imageUrl}
           alt={product.title}
           className="w-full h-full object-cover"
+          onLoad={() => console.log(`✅ [ProductCard-Direct] ${product.title} imagen cargada:`, imageUrl)}
+          onError={(e) => {
+            console.error(`❌ [ProductCard-Direct] ${product.title} error:`, imageUrl);
+            (e.target as HTMLImageElement).src = '/placeholder-product.svg';
+          }}
         />
       </div>
       <CardContent className="p-4">

@@ -1,59 +1,126 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Sidebar } from "@/components/sidebar"
 import { EditProductForm } from "@/components/edit-product-form"
 import { useAuth } from "@/contexts/auth-context"
-import { mockProducts, type Product } from "@/lib/mock-data"
+import { useProducts } from "@/contexts/products-context"
+import { apiService, type Product, type Rental } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { User, Mail, GraduationCap, Package, Calendar, Clock, MapPin, Eye, Edit, Trash2 } from "lucide-react"
-import Image from "next/image"
+import { User, Mail, GraduationCap, Package, Calendar, Clock, MapPin, Eye, Edit, Trash2, Loader2 } from "lucide-react"
+import { SimpleSmartImage } from "@/components/simple-smart-image"
 
 export default function ProfilePage() {
-  const { user, userProducts, deleteProduct } = useAuth()
+  const { user } = useAuth()
   const { toast } = useToast()
+  const { removeProductFromList, refreshProducts } = useProducts()
   const [selectedRental, setSelectedRental] = useState<string | null>(null)
+  const [ownedProducts, setOwnedProducts] = useState<Product[]>([])
+  const [userRentals, setUserRentals] = useState<Rental[]>([])
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true)
+  const [isLoadingRentals, setIsLoadingRentals] = useState(true)
 
-  // Combinar productos mock con productos de usuarios para el historial
-  const allProducts = [...mockProducts, ...userProducts]
-  const rentedProducts = allProducts.filter((product) => user?.rentedProducts.includes(product.id))
+  // Fetch user's owned products
+  useEffect(() => {
+    const fetchOwnedProducts = async () => {
+      if (!user) return
+      
+      try {
+        setIsLoadingProducts(true)
+        const response = await apiService.getProducts()
+        // Filter products owned by current user
+        const userProducts = response.products.filter((product: Product) => product.owner._id === user.id)
+        setOwnedProducts(userProducts)
+      } catch (error) {
+        console.error('Error fetching owned products:', error)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar tus productos",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoadingProducts(false)
+      }
+    }
 
-  // Productos propios del usuario
-  const ownedProducts = userProducts.filter((product) => product.ownerId === user?.id)
+    fetchOwnedProducts()
+  }, [user, toast])
 
-  const selectedRentalDetails = selectedRental ? user?.rentalHistory.find((r) => r.id === selectedRental) : null
+  // Fetch user's rentals
+  useEffect(() => {
+    const fetchUserRentals = async () => {
+      if (!user) return
+      
+      try {
+        setIsLoadingRentals(true)
+        const rentals = await apiService.getUserRentals(user.id)
+        setUserRentals(rentals)
+      } catch (error) {
+        console.error('Error fetching user rentals:', error)
+        toast({
+          title: "Error",
+          description: "No se pudo cargar tu historial de alquileres",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoadingRentals(false)
+      }
+    }
 
-  const handleDeleteProduct = (productId: string, productName: string) => {
-    if (confirm(`¿Estás seguro de que quieres eliminar "${productName}"?`)) {
-      deleteProduct(productId)
+    fetchUserRentals()
+  }, [user, toast])
+
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar "${productName}"?`)) {
+      return
+    }
+
+    try {
+      await apiService.deleteProduct(productId)
+      // Actualizar lista local del perfil
+      setOwnedProducts(prev => prev.filter(p => p._id !== productId))
+      // Actualizar lista global de productos
+      removeProductFromList(productId)
       toast({
         title: "Producto eliminado",
-        description: "El producto ha sido eliminado exitosamente.",
+        description: `"${productName}" ha sido eliminado exitosamente`
+      })
+    } catch (error) {
+      console.error('Error deleting product:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el producto",
+        variant: "destructive"
       })
     }
   }
 
-  if (editingProduct) {
-    return (
-      <ProtectedRoute>
-        <div className="flex h-screen bg-gray-50">
-          <Sidebar />
-          <main className="flex-1 overflow-auto">
-            <div className="p-8">
-              <EditProductForm product={editingProduct} onClose={() => setEditingProduct(null)} />
-            </div>
-          </main>
-        </div>
-      </ProtectedRoute>
-    )
+  const handleUpdateProduct = () => {
+    // Refresh the products list after update
+    const fetchOwnedProducts = async () => {
+      if (!user) return
+      
+      try {
+        const response = await apiService.getProducts()
+        const userProducts = response.products.filter((product: Product) => product.owner._id === user.id)
+        setOwnedProducts(userProducts)
+      } catch (error) {
+        console.error('Error fetching owned products:', error)
+      }
+    }
+
+    fetchOwnedProducts()
+    setEditingProduct(null)
   }
+
+  const selectedRentalDetails = selectedRental ? userRentals.find((r) => r._id === selectedRental) : null
 
   return (
     <ProtectedRoute>
@@ -100,7 +167,7 @@ export default function ProfilePage() {
                       </div>
                       <div className="flex items-center">
                         <Package className="h-4 w-4 text-gray-400 mr-3" />
-                        <span className="text-sm">{user?.rentedProducts.length || 0} productos alquilados</span>
+                        <span className="text-sm">{userRentals.length} productos alquilados</span>
                       </div>
                       <div className="flex items-center">
                         <Package className="h-4 w-4 text-blue-400 mr-3" />
@@ -130,7 +197,11 @@ export default function ProfilePage() {
                         <CardTitle>Historial de Alquileres</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {rentedProducts.length === 0 ? (
+                        {isLoadingRentals ? (
+                          <div className="flex justify-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                          </div>
+                        ) : userRentals.length === 0 ? (
                           <div className="text-center py-8">
                             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                             <h3 className="text-lg font-semibold text-gray-900 mb-2">No has alquilado productos aún</h3>
@@ -140,55 +211,60 @@ export default function ProfilePage() {
                           </div>
                         ) : (
                           <div className="space-y-4">
-                            {rentedProducts.map((product) => {
-                              const rentalDetail = user?.rentalHistory.find((r) => r.productId === product.id)
-                              return (
-                                <div
-                                  key={product.id}
-                                  className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50"
-                                >
-                                  <div className="relative h-16 w-16 rounded-lg overflow-hidden">
-                                    <Image
-                                      src={product.image || "/placeholder.svg"}
-                                      alt={product.name}
-                                      fill
-                                      className="object-cover"
-                                    />
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-semibold">{product.name}</h4>
-                                    <p className="text-sm text-gray-600">Por: {product.owner}</p>
-                                    <div className="flex items-center space-x-2 mt-1">
-                                      <Badge variant="secondary">{product.category}</Badge>
-                                      <span className="text-sm text-gray-500">S/ {product.price}/hora</span>
-                                      {rentalDetail && (
-                                        <span className="text-sm text-blue-600">
-                                          {rentalDetail.hours} {rentalDetail.hours === 1 ? "hora" : "horas"} - Total: S/{" "}
-                                          {rentalDetail.totalPrice}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="text-right space-y-2">
-                                    <Badge variant="outline" className="text-green-600 border-green-600">
-                                      Alquilado
-                                    </Badge>
-                                    {rentalDetail && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          setSelectedRental(selectedRental === rentalDetail.id ? null : rentalDetail.id)
-                                        }
-                                      >
-                                        <Eye className="h-4 w-4 mr-1" />
-                                        {selectedRental === rentalDetail.id ? "Ocultar" : "Ver"} Detalles
-                                      </Button>
-                                    )}
+                            {userRentals.map((rental) => (
+                              <div
+                                key={rental._id}
+                                className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50"
+                              >
+                                <div className="relative h-16 w-16 rounded-lg overflow-hidden">
+                                  <SimpleSmartImage
+                                    imagePath={rental.product.images?.[0]}
+                                    alt={rental.product.title}
+                                    className="w-full h-full object-cover"
+                                    showLoadingIndicator={true}
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold">{rental.product.title}</h4>
+                                  <p className="text-sm text-gray-600">
+                                    Por: {rental.product.owner?.name || 'Usuario desconocido'}
+                                  </p>
+                                  <div className="flex items-center space-x-2 mt-1">
+                                    <Badge variant="secondary">{rental.product.category}</Badge>
+                                    <span className="text-sm text-gray-500">S/ {rental.product.pricePerDay}/día</span>
+                                    <span className="text-sm text-blue-600">
+                                      {rental.days} {rental.days === 1 ? "día" : "días"} - Total: S/ {rental.totalAmount}
+                                    </span>
                                   </div>
                                 </div>
-                              )
-                            })}
+                                <div className="text-right space-y-2">
+                                  <Badge 
+                                    variant="outline" 
+                                    className={
+                                      rental.status === 'active' 
+                                        ? "text-green-600 border-green-600"
+                                        : rental.status === 'completed'
+                                        ? "text-blue-600 border-blue-600"
+                                        : "text-gray-600 border-gray-600"
+                                    }
+                                  >
+                                    {rental.status === 'active' ? 'Activo' : 
+                                     rental.status === 'completed' ? 'Completado' : 
+                                     rental.status === 'pending' ? 'Pendiente' : 'Cancelado'}
+                                  </Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      setSelectedRental(selectedRental === rental._id ? null : rental._id)
+                                    }
+                                  >
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    {selectedRental === rental._id ? "Ocultar" : "Ver"} Detalles
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </CardContent>
@@ -202,7 +278,11 @@ export default function ProfilePage() {
                         <CardTitle>Productos que he Publicado</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {ownedProducts.length === 0 ? (
+                        {isLoadingProducts ? (
+                          <div className="flex justify-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                          </div>
+                        ) : ownedProducts.length === 0 ? (
                           <div className="text-center py-8">
                             <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                             <h3 className="text-lg font-semibold text-gray-900 mb-2">No has publicado productos aún</h3>
@@ -212,23 +292,23 @@ export default function ProfilePage() {
                           <div className="space-y-4">
                             {ownedProducts.map((product) => (
                               <div
-                                key={product.id}
+                                key={product._id}
                                 className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50"
                               >
                                 <div className="relative h-16 w-16 rounded-lg overflow-hidden">
-                                  <Image
-                                    src={product.image || "/placeholder.svg"}
-                                    alt={product.name}
-                                    fill
-                                    className="object-cover"
+                                  <SimpleSmartImage
+                                    imagePath={product.images?.[0]}
+                                    alt={product.title}
+                                    className="w-full h-full object-cover"
+                                    showLoadingIndicator={true}
                                   />
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="font-semibold">{product.name}</h4>
+                                  <h4 className="font-semibold">{product.title}</h4>
                                   <p className="text-sm text-gray-600">{product.description}</p>
                                   <div className="flex items-center space-x-2 mt-1">
                                     <Badge variant="secondary">{product.category}</Badge>
-                                    <span className="text-sm text-gray-500">S/ {product.price}/hora</span>
+                                    <span className="text-sm text-gray-500">S/ {product.pricePerDay}/día</span>
                                     <Badge
                                       variant={product.available ? "default" : "secondary"}
                                       className={
@@ -247,7 +327,7 @@ export default function ProfilePage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => handleDeleteProduct(product.id, product.name)}
+                                    onClick={() => handleDeleteProduct(product._id, product.title)}
                                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                   >
                                     <Trash2 className="h-4 w-4 mr-1" />
@@ -276,54 +356,73 @@ export default function ProfilePage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <h4 className="font-semibold text-sm text-gray-700 mb-1">Producto:</h4>
-                          <p className="text-sm">{selectedRentalDetails.productName}</p>
+                          <p className="text-sm">{selectedRentalDetails.product.title}</p>
                         </div>
                         <div>
                           <h4 className="font-semibold text-sm text-gray-700 mb-1">Duración:</h4>
                           <p className="text-sm">
-                            {selectedRentalDetails.hours} {selectedRentalDetails.hours === 1 ? "hora" : "horas"}
+                            {selectedRentalDetails.days} {selectedRentalDetails.days === 1 ? "día" : "días"}
                           </p>
                         </div>
                         <div>
-                          <h4 className="font-semibold text-sm text-gray-700 mb-1">Fecha de Recogida:</h4>
-                          <p className="text-sm">{selectedRentalDetails.pickupDate}</p>
+                          <h4 className="font-semibold text-sm text-gray-700 mb-1">Fecha de Inicio:</h4>
+                          <p className="text-sm">{new Date(selectedRentalDetails.startDate).toLocaleDateString('es-ES')}</p>
                         </div>
                         <div>
-                          <h4 className="font-semibold text-sm text-gray-700 mb-1">Hora de Recogida:</h4>
-                          <p className="text-sm">{selectedRentalDetails.pickupTime}</p>
+                          <h4 className="font-semibold text-sm text-gray-700 mb-1">Fecha de Fin:</h4>
+                          <p className="text-sm">{new Date(selectedRentalDetails.endDate).toLocaleDateString('es-ES')}</p>
                         </div>
                         <div className="md:col-span-2">
-                          <h4 className="font-semibold text-sm text-gray-700 mb-1">Lugar de Recogida:</h4>
+                          <h4 className="font-semibold text-sm text-gray-700 mb-1">Ubicación de Recogida:</h4>
                           <p className="text-sm flex items-center">
                             <MapPin className="h-4 w-4 mr-1" />
-                            {selectedRentalDetails.pickupAddress}
-                          </p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <h4 className="font-semibold text-sm text-gray-700 mb-1">Lugar de Devolución:</h4>
-                          <p className="text-sm flex items-center">
-                            <MapPin className="h-4 w-4 mr-1" />
-                            {selectedRentalDetails.returnAddress}
+                            {selectedRentalDetails.product.pickupAddress}
                           </p>
                         </div>
                         <div>
                           <h4 className="font-semibold text-sm text-gray-700 mb-1">Total Pagado:</h4>
-                          <p className="text-lg font-bold text-green-600">S/ {selectedRentalDetails.totalPrice}</p>
+                          <p className="text-lg font-bold text-green-600">S/ {selectedRentalDetails.totalAmount}</p>
                         </div>
                         <div>
                           <h4 className="font-semibold text-sm text-gray-700 mb-1">Estado:</h4>
-                          <Badge variant="outline" className="text-green-600 border-green-600">
-                            {selectedRentalDetails.status === "active" ? "Activo" : "Completado"}
+                          <Badge 
+                            variant="outline" 
+                            className={
+                              selectedRentalDetails.status === 'active' 
+                                ? "text-green-600 border-green-600"
+                                : selectedRentalDetails.status === 'completed'
+                                ? "text-blue-600 border-blue-600"
+                                : "text-gray-600 border-gray-600"
+                            }
+                          >
+                            {selectedRentalDetails.status === 'active' ? 'Activo' : 
+                             selectedRentalDetails.status === 'completed' ? 'Completado' : 
+                             selectedRentalDetails.status === 'pending' ? 'Pendiente' : 'Cancelado'}
                           </Badge>
                         </div>
                       </div>
                       <div className="bg-blue-50 p-3 rounded-lg">
                         <p className="text-sm text-blue-800">
-                          <strong>Recordatorio:</strong> El pago se realizó en efectivo al momento de la recogida.
+                          <strong>Recordatorio:</strong> Contacta al propietario para coordinar la entrega y devolución del producto.
                         </p>
                       </div>
                     </CardContent>
                   </Card>
+                )}
+
+                {/* Edit Product Modal */}
+                {editingProduct && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
+                      <div className="p-6">
+                        <h2 className="text-2xl font-bold mb-4">Editar Producto</h2>
+                        <EditProductForm
+                          product={editingProduct}
+                          onClose={handleUpdateProduct}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

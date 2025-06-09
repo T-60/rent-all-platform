@@ -10,16 +10,18 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Search, Filter, Loader2 } from "lucide-react"
-import { reverseTranslateCategory } from "@/lib/utils-api"
 
 const categories = [
-  { value: "Todos", label: "Todos" },
-  { value: "electronics", label: "Electrónicos" },
-  { value: "vehicles", label: "Vehículos" },
-  { value: "tools", label: "Herramientas" },
-  { value: "furniture", label: "Muebles" },
-  { value: "sports", label: "Deportes" },
-  { value: "others", label: "Otros" }
+  "Todos",
+  "Electrónicos",
+  "Deportes",
+  "Herramientas",
+  "Vehículos",
+  "Hogar",
+  "Instrumentos",
+  "Tecnología",
+  "Libros",
+  "Ropa"
 ]
 
 export default function ProductsPage() {
@@ -76,8 +78,8 @@ export default function ProductsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
-                      <SelectItem key={category.value} value={category.value}>
-                        {category.label}
+                      <SelectItem key={category} value={category}>
+                        {category}
                       </SelectItem>
                     ))}
                   </SelectContent>
