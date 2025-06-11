@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
+import { useNotifications } from "@/contexts/notification-context"
 import { Button } from "@/components/ui/button"
 import { Home, Package, User, Bell, LogOut, ShoppingBag } from "lucide-react"
 
@@ -16,10 +17,8 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { logout, user, notifications } = useAuth()
-
-  // Contar notificaciones no leídas
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const { logout, user } = useAuth()
+  const { unreadCount } = useNotifications()
 
   return (
     <div className="flex h-full w-64 flex-col bg-white border-r border-gray-200">

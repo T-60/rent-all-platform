@@ -79,6 +79,46 @@ export interface Rental {
   updatedAt: string;
 }
 
+export interface Notification {
+  _id: string;
+  recipient: string;
+  title: string;
+  message: string;
+  type: 'welcome' | 'rental_created' | 'rental_request' | 'rental_confirmed' | 'rental_cancelled' | 'product_created' | 'product_rented' | 'system';
+  read: boolean;
+  relatedProduct?: {
+    _id: string;
+    title: string;
+    images: string[];
+  };
+  relatedRental?: {
+    _id: string;
+    startDate: string;
+    endDate: string;
+    totalPrice: number;
+  };
+  relatedUser?: {
+    _id: string;
+    name: string;
+    avatar?: string;
+  };
+  metadata: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalNotifications: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+  unreadCount: number;
+}
+
 class ApiService {
   private getHeaders(includeAuth: boolean = false): HeadersInit {
     const headers: HeadersInit = {
@@ -92,16 +132,42 @@ class ApiService {
       }
     }
 
+    console.log('🔧 Headers generated:', headers);
     return headers;
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
-    const data = await response.json();
+    console.log('🔧 API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
     
-    if (!response.ok) {
-      throw new Error(data.message || 'Error en la petición');
+    let data;
+    
+    try {
+      const text = await response.text();
+      console.log('🔧 Response text:', text);
+      
+      if (text) {
+        data = JSON.parse(text);
+        console.log('🔧 Parsed JSON:', data);
+      } else {
+        data = {};
+        console.log('🔧 Empty response, using empty object');
+      }
+    } catch (error) {
+      console.error('❌ Error parsing JSON response:', error);
+      console.error('❌ Response was:', response);
+      throw new Error('Respuesta inválida del servidor');
     }
     
+    if (!response.ok) {
+      console.error('❌ API Error:', data);
+      throw new Error(data.message || `Error del servidor: ${response.status}`);
+    }
+    
+    console.log('✅ API Success:', data);
     return data;
   }
 
@@ -113,12 +179,17 @@ class ApiService {
     university: string;
     phone?: string;
   }): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/register`, {
+    const url = `${API_URL}/auth/register`;
+    console.log('🔧 Register URL:', url);
+    console.log('🔧 Register data:', userData);
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(userData),
     });
 
+    console.log('🔧 Register response received:', response);
     return this.handleResponse<AuthResponse>(response);
   }
 
@@ -126,12 +197,17 @@ class ApiService {
     email: string;
     password: string;
   }): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const url = `${API_URL}/auth/login`;
+    console.log('🔧 Login URL:', url);
+    console.log('🔧 Login credentials:', { email: credentials.email });
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(credentials),
     });
 
+    console.log('🔧 Login response received:', response);
     return this.handleResponse<AuthResponse>(response);
   }
 
@@ -262,12 +338,43 @@ class ApiService {
   }
 
   async getOwnerRentals(): Promise<{ rentals: any[] }> {
-    const response = await fetch(`${API_URL}/rentals/owner`, {
+    const response = await fetch(`${API_URL}/rentals/my-listings`, {
       method: 'GET',
       headers: this.getHeaders(true),
     });
 
     return this.handleResponse<{ rentals: any[] }>(response);
+  }
+
+  // Actualizar estado de alquiler (confirmar, rechazar, etc.)
+  async updateRentalStatus(rentalId: string, status: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled'): Promise<{ rental: any; message: string }> {
+    const response = await fetch(`${API_URL}/rentals/${rentalId}/status`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ status }),
+    });
+
+    return this.handleResponse<{ rental: any; message: string }>(response);
+  }
+
+  // Cancelar alquiler
+  async cancelRental(rentalId: string): Promise<{ rental: any; message: string }> {
+    const response = await fetch(`${API_URL}/rentals/${rentalId}/cancel`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<{ rental: any; message: string }>(response);
+  }
+
+  // Obtener detalles de un alquiler específico
+  async getRental(rentalId: string): Promise<{ rental: any }> {
+    const response = await fetch(`${API_URL}/rentals/${rentalId}`, {
+      method: 'GET',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<{ rental: any }>(response);
   }
 
   async getUserRentals(userId: string): Promise<Rental[]> {
@@ -287,6 +394,87 @@ class ApiService {
     });
 
     return this.handleResponse<{ message: string; timestamp: string; environment: string }>(response);
+  }
+
+  // ===============================
+  // MÉTODOS PARA NOTIFICACIONES
+  // ===============================
+
+  // Obtener notificaciones del usuario
+  async getNotifications(page: number = 1, limit: number = 20, unreadOnly: boolean = false): Promise<NotificationsResponse> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      unreadOnly: unreadOnly.toString()
+    });
+
+    const response = await fetch(`${API_URL}/notifications?${params}`, {
+      method: 'GET',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<NotificationsResponse>(response);
+  }
+
+  // Marcar notificación específica como leída
+  async markNotificationAsRead(notificationId: string): Promise<{ message: string; notification: Notification }> {
+    const response = await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<{ message: string; notification: Notification }>(response);
+  }
+
+  // Marcar todas las notificaciones como leídas
+  async markAllNotificationsAsRead(): Promise<{ message: string; modifiedCount: number }> {
+    const response = await fetch(`${API_URL}/notifications/mark-all-read`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<{ message: string; modifiedCount: number }>(response);
+  }
+
+  // Marcar notificaciones específicas como leídas
+  async markNotificationsAsRead(notificationIds: string[]): Promise<{ message: string; modifiedCount: number }> {
+    const response = await fetch(`${API_URL}/notifications/mark-read`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ notificationIds }),
+    });
+
+    return this.handleResponse<{ message: string; modifiedCount: number }>(response);
+  }
+
+  // Obtener conteo de notificaciones no leídas
+  async getUnreadNotificationsCount(): Promise<{ unreadCount: number }> {
+    const response = await fetch(`${API_URL}/notifications/unread-count`, {
+      method: 'GET',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<{ unreadCount: number }>(response);
+  }
+
+  // Eliminar notificación específica
+  async deleteNotification(notificationId: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_URL}/notifications/${notificationId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<{ message: string }>(response);
+  }
+
+  // Eliminar todas las notificaciones leídas
+  async clearReadNotifications(): Promise<{ message: string; deletedCount: number }> {
+    const response = await fetch(`${API_URL}/notifications/clear-read`, {
+      method: 'DELETE',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<{ message: string; deletedCount: number }>(response);
   }
 }
 
