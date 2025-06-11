@@ -30,25 +30,35 @@ export default function AuthPage() {
     const password = formData.get("password") as string
 
     console.log('📧 [AuthPage] Email:', email)
-    const success = await login(email, password)
-    console.log('📊 [AuthPage] Resultado del login:', success)
+    
+    try {
+      const result = await login({ email, password })
+      console.log('📊 [AuthPage] Resultado del login:', result)
 
-    if (success) {
-      console.log('✅ [AuthPage] Login exitoso, mostrando toast...')
-      toast({
-        title: "¡Bienvenido!",
-        description: "Has iniciado sesión correctamente.",
-      })
-      console.log('🚀 [AuthPage] Redirigiendo al dashboard...')
-      // Agregar un pequeño delay para permitir que el estado se actualice
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 100)
-    } else {
-      console.log('❌ [AuthPage] Login falló, mostrando error...')
+      if (result.success) {
+        console.log('✅ [AuthPage] Login exitoso, mostrando toast...')
+        toast({
+          title: "¡Bienvenido!",
+          description: "Has iniciado sesión correctamente.",
+        })
+        console.log('🚀 [AuthPage] Redirigiendo al dashboard...')
+        // Agregar un pequeño delay para permitir que el estado se actualice
+        setTimeout(() => {
+          router.push("/dashboard")
+        }, 100)
+      } else {
+        console.log('❌ [AuthPage] Login falló:', result.error)
+        toast({
+          title: "Error",
+          description: result.error || "Email o contraseña incorrectos.",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      console.error('❌ [AuthPage] Error inesperado en login:', error)
       toast({
         title: "Error",
-        description: "Email o contraseña incorrectos.",
+        description: "Error inesperado. Intenta nuevamente.",
         variant: "destructive",
       })
     }
@@ -81,25 +91,34 @@ export default function AuthPage() {
       return
     }
 
-    const success = await register(name, email, university, password)
-    console.log('📊 [AuthPage] Resultado del registro:', success)
+    try {
+      const result = await register({ name, email, university, password })
+      console.log('📊 [AuthPage] Resultado del registro:', result)
 
-    if (success) {
-      console.log('✅ [AuthPage] Registro exitoso, mostrando toast...')
-      toast({
-        title: "¡Registro exitoso!",
-        description: "Tu cuenta ha sido creada correctamente.",
-      })
-      console.log('🚀 [AuthPage] Redirigiendo al dashboard...')
-      // Agregar un pequeño delay para permitir que el estado se actualice
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 100)
-    } else {
-      console.log('❌ [AuthPage] Registro falló, mostrando error...')
+      if (result.success) {
+        console.log('✅ [AuthPage] Registro exitoso, mostrando toast...')
+        toast({
+          title: "¡Registro exitoso!",
+          description: "Tu cuenta ha sido creada correctamente.",
+        })
+        console.log('🚀 [AuthPage] Redirigiendo al dashboard...')
+        // Agregar un pequeño delay para permitir que el estado se actualice
+        setTimeout(() => {
+          router.push("/dashboard")
+        }, 100)
+      } else {
+        console.log('❌ [AuthPage] Registro falló:', result.error)
+        toast({
+          title: "Error",
+          description: result.error || "Error al crear la cuenta. Intenta nuevamente.",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      console.error('❌ [AuthPage] Error inesperado en registro:', error)
       toast({
         title: "Error",
-        description: "Error al crear la cuenta. Intenta nuevamente.",
+        description: "Error inesperado. Intenta nuevamente.",
         variant: "destructive",
       })
     }
