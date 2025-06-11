@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const Rental = require('../models/Rental');
 const Product = require('../models/Product');
 const { authMiddleware } = require('../middleware/auth');
+const NotificationService = require('../services/NotificationService');
 
 const router = express.Router();
 
@@ -149,6 +150,33 @@ router.post('/', authMiddleware, [
       { path: 'renter', select: 'name email phone avatar' },
       { path: 'owner', select: 'name email phone avatar' }
     ]);
+
+    // Crear notificaciones para ambas partes
+    try {
+      // Notificación para el arrendatario (quien creó la solicitud)
+      await NotificationService.createRentalCreatedNotification(
+        rental.renter._id,
+        rental.product.title,
+        rental.totalPrice,
+        rental._id,
+        rental.product._id
+      );
+
+      // Notificación para el propietario (nueva solicitud)
+      await NotificationService.createRentalRequestNotification(
+        rental.owner._id,
+        rental.renter.name,
+        rental.product.title,
+        rental._id,
+        rental.product._id,
+        rental.renter._id
+      );
+
+      console.log(`✅ Notificaciones de alquiler creadas para rental ${rental._id}`);
+    } catch (notificationError) {
+      console.error('❌ Error creando notificaciones de alquiler:', notificationError);
+      // No fallar la creación por error en notificación
+    }
 
     res.status(201).json({
       message: 'Solicitud de alquiler creada exitosamente',
@@ -330,6 +358,46 @@ router.put('/:id/status', authMiddleware, [
 
     rental.status = status;
     await rental.save();
+
+    // Crear notificaciones según el nuevo estado
+    try {
+      if (status === 'confirmed') {
+        // Notificar al arrendatario que su solicitud fue confirmada
+        await NotificationService.createRentalConfirmedNotification(
+          rental.renter._id,
+          rental.product.title,
+          rental.totalPrice,
+          rental._id,
+          rental.product._id,
+          rental.owner.toString()
+        );
+
+        // Notificar al propietario que su producto fue alquilado
+        await NotificationService.createProductRentedNotification(
+          rental.owner.toString(),
+          rental.renter.name,
+          rental.product.title,
+          rental.totalPrice,
+          rental._id,
+          rental.product._id,
+          rental.renter._id
+        );
+      } else if (status === 'cancelled') {
+        // Notificar cancelación a ambas partes
+        await NotificationService.createRentalCancelledNotification(
+          rental.renter._id,
+          rental.product.title,
+          'El propietario canceló la solicitud.',
+          rental._id,
+          rental.product._id
+        );
+      }
+      
+      console.log(`✅ Notificaciones de cambio de estado creadas para rental ${rental._id}`);
+    } catch (notificationError) {
+      console.error('❌ Error creando notificaciones de estado:', notificationError);
+      // No fallar la actualización por error en notificación
+    }
 
     res.json({
       message: `Estado del alquiler actualizado a ${status}`,

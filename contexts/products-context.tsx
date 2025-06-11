@@ -25,6 +25,7 @@ interface ProductsContextType {
   removeProductFromList: (productId: string) => void
   addProductToList: (product: ApiProduct) => void
   updateProductInList: (product: ApiProduct) => void
+  clearProductsCache: () => void
 }
 
 const ProductsContext = createContext<ProductsContextType | undefined>(undefined)
@@ -82,6 +83,20 @@ export function ProductsProvider({ children }: { children: React.ReactNode }) {
     setProducts(prev => prev.map(p => p._id === updatedProduct._id ? updatedProduct : p))
   }
 
+  const clearProductsCache = () => {
+    console.log('🧹 Limpiando caché de productos...');
+    setProducts([]);
+    setCurrentPage(1);
+    setTotalPages(1);
+    setSearchTerm("");
+    setSelectedCategory("");
+    setError(null);
+    // Forzar una nueva carga desde el servidor
+    setTimeout(() => {
+      searchProducts();
+    }, 100);
+  }
+
   // Cargar productos iniciales
   useEffect(() => {
     searchProducts()
@@ -116,6 +131,7 @@ export function ProductsProvider({ children }: { children: React.ReactNode }) {
         removeProductFromList,
         addProductToList,
         updateProductInList,
+        clearProductsCache,
       }}
     >
       {children}

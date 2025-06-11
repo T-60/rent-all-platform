@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Search, Filter, Loader2 } from "lucide-react"
+import { Search, Filter, Loader2, RefreshCw } from "lucide-react"
 import { reverseTranslateCategory } from "@/lib/utils-api"
 
 const categories = [
@@ -31,7 +31,8 @@ export default function ProductsPage() {
     selectedCategory,
     setSearchTerm, 
     setSelectedCategory,
-    refreshProducts 
+    refreshProducts,
+    clearProductsCache 
   } = useProducts()
   const { user } = useAuth()
   const [priceRange, setPriceRange] = useState("all")
@@ -103,6 +104,14 @@ export default function ProductsPage() {
                 >
                   <Filter className="h-4 w-4 mr-2" />
                   Limpiar
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={clearProductsCache}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Actualizar
                 </Button>
               </div>
             </div>

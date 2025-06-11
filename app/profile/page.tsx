@@ -23,9 +23,11 @@ export default function ProfilePage() {
   const [selectedRental, setSelectedRental] = useState<string | null>(null)
   const [ownedProducts, setOwnedProducts] = useState<Product[]>([])
   const [userRentals, setUserRentals] = useState<Rental[]>([])
+  const [ownerRentals, setOwnerRentals] = useState<any[]>([])  // Solicitudes como propietario
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
   const [isLoadingRentals, setIsLoadingRentals] = useState(true)
+  const [isLoadingOwnerRentals, setIsLoadingOwnerRentals] = useState(true)
 
   // Fetch user's owned products
   useEffect(() => {
@@ -37,7 +39,26 @@ export default function ProfilePage() {
         const response = await apiService.getProducts()
         // Filter products owned by current user
         const userProducts = response.products.filter((product: Product) => product.owner._id === user.id)
-        setOwnedProducts(userProducts)
+        
+        // Validar productos para evitar errores de imágenes
+        const validProducts = userProducts.filter(product => {
+          if (!product || !product._id || !product.title) {
+            console.warn('⚠️ Producto sin datos mínimos:', product);
+            return false;
+          }
+          
+          // Verificar imágenes
+          if (product.images && Array.isArray(product.images)) {
+            product.images = product.images.filter(img => 
+              img && typeof img === 'string' && img !== 'undefined' && img !== 'null'
+            );
+          }
+          
+          return true;
+        });
+        
+        console.log(`✅ Productos propios cargados: ${userProducts.length} total, ${validProducts.length} válidos`);
+        setOwnedProducts(validProducts)
       } catch (error) {
         console.error('Error fetching owned products:', error)
         toast({
@@ -61,7 +82,25 @@ export default function ProfilePage() {
       try {
         setIsLoadingRentals(true)
         const rentals = await apiService.getUserRentals(user.id)
-        setUserRentals(rentals)
+        
+        // Filtrar y validar alquileres para evitar errores de imágenes
+        const validRentals = rentals.filter(rental => {
+          if (!rental || !rental.product) {
+            console.warn('⚠️ Alquiler sin producto válido:', rental);
+            return false;
+          }
+          
+          // Validar que el producto tenga datos mínimos
+          if (!rental.product._id || !rental.product.title) {
+            console.warn('⚠️ Producto sin datos mínimos:', rental.product);
+            return false;
+          }
+          
+          return true;
+        });
+        
+        console.log(`✅ Alquileres cargados: ${rentals.length} total, ${validRentals.length} válidos`);
+        setUserRentals(validRentals)
       } catch (error) {
         console.error('Error fetching user rentals:', error)
         toast({
@@ -75,6 +114,41 @@ export default function ProfilePage() {
     }
 
     fetchUserRentals()
+  }, [user, toast])
+
+  // Fetch rentals where user is the owner (rental requests)
+  useEffect(() => {
+    const fetchOwnerRentals = async () => {
+      if (!user) return
+      
+      try {
+        setIsLoadingOwnerRentals(true)
+        const response = await apiService.getOwnerRentals()
+        
+        // Filtrar y validar alquileres
+        const validRentals = response.rentals.filter(rental => {
+          if (!rental || !rental.product) {
+            console.warn('⚠️ Alquiler sin producto válido:', rental);
+            return false;
+          }
+          return true;
+        });
+        
+        console.log(`✅ Solicitudes de alquiler cargadas: ${response.rentals.length} total, ${validRentals.length} válidas`);
+        setOwnerRentals(validRentals)
+      } catch (error) {
+        console.error('Error fetching owner rentals:', error)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las solicitudes de alquiler",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoadingOwnerRentals(false)
+      }
+    }
+
+    fetchOwnerRentals()
   }, [user, toast])
 
   const handleDeleteProduct = async (productId: string, productName: string) => {
@@ -118,6 +192,66 @@ export default function ProfilePage() {
 
     fetchOwnedProducts()
     setEditingProduct(null)
+  }
+
+  // Función para confirmar alquiler
+  const handleConfirmRental = async (rentalId: string, productTitle: string) => {
+    if (!confirm(`¿Confirmar el alquiler de "${productTitle}"?`)) {
+      return
+    }
+
+    try {
+      await apiService.updateRentalStatus(rentalId, 'confirmed')
+      
+      // Actualizar la lista local
+      setOwnerRentals(prev => prev.map(rental => 
+        rental._id === rentalId 
+          ? { ...rental, status: 'confirmed' }
+          : rental
+      ))
+      
+      toast({
+        title: "Alquiler confirmado",
+        description: `Has confirmado el alquiler de "${productTitle}"`
+      })
+    } catch (error) {
+      console.error('Error confirming rental:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo confirmar el alquiler",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Función para rechazar alquiler
+  const handleRejectRental = async (rentalId: string, productTitle: string) => {
+    if (!confirm(`¿Rechazar el alquiler de "${productTitle}"?`)) {
+      return
+    }
+
+    try {
+      await apiService.updateRentalStatus(rentalId, 'cancelled')
+      
+      // Actualizar la lista local
+      setOwnerRentals(prev => prev.map(rental => 
+        rental._id === rentalId 
+          ? { ...rental, status: 'cancelled' }
+          : rental
+      ))
+      
+      toast({
+        title: "Alquiler rechazado",
+        description: `Has rechazado el alquiler de "${productTitle}"`
+      })
+    } catch (error) {
+      console.error('Error rejecting rental:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo rechazar el alquiler",
+        variant: "destructive"
+      })
+    }
   }
 
   const selectedRentalDetails = selectedRental ? userRentals.find((r) => r._id === selectedRental) : null
@@ -185,8 +319,16 @@ export default function ProfilePage() {
               {/* Tabs for Rental History and Owned Products */}
               <div className="lg:col-span-2">
                 <Tabs defaultValue="rentals" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="rentals">Productos Alquilados</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="rentals">Mis Alquileres</TabsTrigger>
+                    <TabsTrigger value="requests" className="relative">
+                      Solicitudes
+                      {ownerRentals.filter(r => r.status === 'pending').length > 0 && (
+                        <Badge className="ml-2 h-5 w-5 p-0 text-xs bg-red-500">
+                          {ownerRentals.filter(r => r.status === 'pending').length}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
                     <TabsTrigger value="owned">Mis Productos</TabsTrigger>
                   </TabsList>
 
@@ -222,6 +364,7 @@ export default function ProfilePage() {
                                     alt={rental.product.title}
                                     className="w-full h-full object-cover"
                                     showLoadingIndicator={true}
+                                    debugId={`Profile-Rental-${rental._id}`}
                                   />
                                 </div>
                                 <div className="flex-1">
@@ -271,6 +414,126 @@ export default function ProfilePage() {
                     </Card>
                   </TabsContent>
 
+                  {/* Rental Requests Tab */}
+                  <TabsContent value="requests">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center">
+                          Solicitudes de Alquiler
+                          {ownerRentals.filter(r => r.status === 'pending').length > 0 && (
+                            <Badge className="ml-2 bg-orange-100 text-orange-800">
+                              {ownerRentals.filter(r => r.status === 'pending').length} pendientes
+                            </Badge>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {isLoadingOwnerRentals ? (
+                          <div className="flex justify-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                          </div>
+                        ) : ownerRentals.length === 0 ? (
+                          <div className="text-center py-8">
+                            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">No tienes solicitudes de alquiler</h3>
+                            <p className="text-gray-600">
+                              Cuando alguien solicite alquilar tus productos, aparecerán aquí
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {ownerRentals.map((rental) => (
+                              <div
+                                key={rental._id}
+                                className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50"
+                              >
+                                <div className="relative h-16 w-16 rounded-lg overflow-hidden">
+                                  <SimpleSmartImage
+                                    imagePath={rental.product.images?.[0]}
+                                    alt={rental.product.title}
+                                    className="w-full h-full object-cover"
+                                    showLoadingIndicator={true}
+                                    debugId={`Profile-OwnerRental-${rental._id}`}
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold">{rental.product.title}</h4>
+                                  <p className="text-sm text-gray-600">
+                                    Solicitado por: <span className="font-medium text-blue-600">{rental.renter.name}</span>
+                                  </p>
+                                  <div className="flex items-center space-x-2 mt-1">
+                                    <Badge variant="secondary">{rental.product.category}</Badge>
+                                    <span className="text-sm text-gray-500">S/ {rental.pricePerDay}/día</span>
+                                    <span className="text-sm text-blue-600">
+                                      {rental.totalDays} {rental.totalDays === 1 ? "día" : "días"} - Total: S/ {rental.totalPrice}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center space-x-2 mt-2 text-sm text-gray-500">
+                                    <Calendar className="h-4 w-4" />
+                                    <span>
+                                      {new Date(rental.startDate).toLocaleDateString('es-ES')} - {new Date(rental.endDate).toLocaleDateString('es-ES')}
+                                    </span>
+                                  </div>
+                                  {rental.notes && (
+                                    <p className="text-sm text-gray-600 mt-1 italic">
+                                      Nota: {rental.notes}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="text-right space-y-2">
+                                  <Badge 
+                                    variant="outline" 
+                                    className={
+                                      rental.status === 'confirmed' 
+                                        ? "text-green-600 border-green-600"
+                                        : rental.status === 'pending'
+                                        ? "text-orange-600 border-orange-600"
+                                        : rental.status === 'cancelled'
+                                        ? "text-red-600 border-red-600"
+                                        : "text-gray-600 border-gray-600"
+                                    }
+                                  >
+                                    {rental.status === 'confirmed' ? 'Confirmado' : 
+                                     rental.status === 'pending' ? 'Pendiente' : 
+                                     rental.status === 'cancelled' ? 'Rechazado' :
+                                     rental.status === 'active' ? 'Activo' : 'Completado'}
+                                  </Badge>
+                                  
+                                  {rental.status === 'pending' && (
+                                    <div className="flex flex-col space-y-1">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleConfirmRental(rental._id, rental.product.title)}
+                                        className="bg-green-600 hover:bg-green-700 text-white"
+                                      >
+                                        ✓ Confirmar
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleRejectRental(rental._id, rental.product.title)}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        ✗ Rechazar
+                                      </Button>
+                                    </div>
+                                  )}
+                                  
+                                  {rental.status === 'confirmed' && (
+                                    <div className="text-xs text-green-600 text-center bg-green-50 p-2 rounded">
+                                      ¡Alquiler confirmado!<br/>
+                                      Contacta a {rental.renter.name} para coordinar la entrega
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
                   {/* Owned Products Tab */}
                   <TabsContent value="owned">
                     <Card>
@@ -301,6 +564,7 @@ export default function ProfilePage() {
                                     alt={product.title}
                                     className="w-full h-full object-cover"
                                     showLoadingIndicator={true}
+                                    debugId={`Profile-OwnedProduct-${product._id}`}
                                   />
                                 </div>
                                 <div className="flex-1">

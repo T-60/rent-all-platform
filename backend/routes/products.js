@@ -5,6 +5,7 @@ const { authMiddleware, optionalAuth } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const NotificationService = require('../services/NotificationService');
 
 const router = express.Router();
 
@@ -315,6 +316,19 @@ router.post('/', authMiddleware, upload.array('images', 5), [
 
     await product.save();
     await product.populate('owner', 'name email avatar location');
+
+    // Crear notificación de producto creado
+    try {
+      await NotificationService.createProductCreatedNotification(
+        req.user._id,
+        product.title,
+        product._id
+      );
+      console.log(`✅ Notificación de producto creado para usuario ${req.user.email}`);
+    } catch (notificationError) {
+      console.error('❌ Error creando notificación de producto:', notificationError);
+      // No fallar la creación por error en notificación
+    }
 
     res.status(201).json({
       message: '¡Producto creado exitosamente! Tu producto ya está disponible para alquiler.',

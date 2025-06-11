@@ -1,0 +1,176 @@
+"use client"
+
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import { apiService, type Notification, type NotificationsResponse } from '@/lib/api'
+import { useAuth } from './auth-context'
+
+interface NotificationContextType {
+  notifications: Notification[]
+  unreadCount: number
+  isLoading: boolean
+  refreshNotifications: () => Promise<void>
+  markAsRead: (notificationId: string) => Promise<void>
+  markAllAsRead: () => Promise<void>
+  deleteNotification: (notificationId: string) => Promise<void>
+  clearReadNotifications: () => Promise<void>
+}
+
+const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
+
+export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, user } = useAuth()
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Función para cargar notificaciones desde el backend
+  const refreshNotifications = async () => {
+    if (!isAuthenticated || !user) return
+
+    try {
+      setIsLoading(true)
+      console.log('🔔 Cargando notificaciones desde el backend...')
+      
+      const response: NotificationsResponse = await apiService.getNotifications(1, 50)
+      
+      setNotifications(response.notifications)
+      setUnreadCount(response.unreadCount)
+      
+      console.log(`✅ Notificaciones cargadas: ${response.notifications.length} total, ${response.unreadCount} no leídas`)
+    } catch (error) {
+      console.error('❌ Error cargando notificaciones:', error)
+      // Mantener las notificaciones existentes en caso de error
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Marcar notificación como leída
+  const markAsRead = async (notificationId: string) => {
+    try {
+      await apiService.markNotificationAsRead(notificationId)
+      
+      // Actualizar estado local
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification._id === notificationId 
+            ? { ...notification, read: true }
+            : notification
+        )
+      )
+      
+      setUnreadCount(prev => Math.max(0, prev - 1))
+      
+      console.log(`✅ Notificación ${notificationId} marcada como leída`)
+    } catch (error) {
+      console.error('❌ Error marcando notificación como leída:', error)
+      throw error
+    }
+  }
+
+  // Marcar todas las notificaciones como leídas
+  const markAllAsRead = async () => {
+    try {
+      const response = await apiService.markAllNotificationsAsRead()
+      
+      // Actualizar estado local
+      setNotifications(prev => 
+        prev.map(notification => ({ ...notification, read: true }))
+      )
+      
+      setUnreadCount(0)
+      
+      console.log(`✅ ${response.modifiedCount} notificaciones marcadas como leídas`)
+    } catch (error) {
+      console.error('❌ Error marcando todas las notificaciones como leídas:', error)
+      throw error
+    }
+  }
+
+  // Eliminar notificación específica
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      await apiService.deleteNotification(notificationId)
+      
+      // Actualizar estado local
+      const notificationToDelete = notifications.find(n => n._id === notificationId)
+      setNotifications(prev => prev.filter(n => n._id !== notificationId))
+      
+      if (notificationToDelete && !notificationToDelete.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1))
+      }
+      
+      console.log(`✅ Notificación ${notificationId} eliminada`)
+    } catch (error) {
+      console.error('❌ Error eliminando notificación:', error)
+      throw error
+    }
+  }
+
+  // Eliminar todas las notificaciones leídas
+  const clearReadNotifications = async () => {
+    try {
+      const response = await apiService.clearReadNotifications()
+      
+      // Actualizar estado local - mantener solo las no leídas
+      setNotifications(prev => prev.filter(n => !n.read))
+      
+      console.log(`✅ ${response.deletedCount} notificaciones leídas eliminadas`)
+    } catch (error) {
+      console.error('❌ Error eliminando notificaciones leídas:', error)
+      throw error
+    }
+  }
+
+  // Cargar notificaciones cuando el usuario se autentica
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      refreshNotifications()
+    } else {
+      // Limpiar notificaciones cuando no hay usuario
+      setNotifications([])
+      setUnreadCount(0)
+    }
+  }, [isAuthenticated, user])
+
+  // Actualizar conteo de no leídas cada cierto tiempo
+  useEffect(() => {
+    if (!isAuthenticated || !user) return
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await apiService.getUnreadNotificationsCount()
+        setUnreadCount(response.unreadCount)
+      } catch (error) {
+        console.error('❌ Error actualizando conteo de notificaciones:', error)
+      }
+    }, 30000) // Cada 30 segundos
+
+    return () => clearInterval(interval)
+  }, [isAuthenticated, user])
+
+  return (
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        unreadCount,
+        isLoading,
+        refreshNotifications,
+        markAsRead,
+        markAllAsRead,
+        deleteNotification,
+        clearReadNotifications,
+      }}
+    >
+      {children}
+    </NotificationContext.Provider>
+  )
+}
+
+export function useNotifications() {
+  const context = useContext(NotificationContext)
+  if (context === undefined) {
+    throw new Error('useNotifications must be used within a NotificationProvider')
+  }
+  return context
+}

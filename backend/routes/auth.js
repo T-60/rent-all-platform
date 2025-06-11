@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
+const NotificationService = require('../services/NotificationService');
 
 const router = express.Router();
 
@@ -43,6 +44,15 @@ router.post('/register', [
     });
 
     await user.save();
+
+    // Crear notificación de bienvenida
+    try {
+      await NotificationService.createWelcomeNotification(user._id);
+      console.log(`✅ Notificación de bienvenida creada para usuario ${user.email}`);
+    } catch (notificationError) {
+      console.error('❌ Error creando notificación de bienvenida:', notificationError);
+      // No fallar el registro por error en notificación
+    }
 
     // Crear JWT token
     const token = jwt.sign(

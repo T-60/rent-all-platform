@@ -29,6 +29,7 @@ export function ProductCard({ product }: ProductCardProps) {
           imagePath={firstImagePath}
           alt={product.title}
           className="w-full h-full object-cover"
+          debugId={`ProductCard-${product._id}`}
         />
       </div>
       <CardContent className="p-4">

@@ -2,36 +2,91 @@
 
 import { ProtectedRoute } from "@/components/protected-route"
 import { Sidebar } from "@/components/sidebar"
-import { useAuth } from "@/contexts/auth-context"
+import { useNotifications } from "@/contexts/notification-context"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { Bell, Check, Clock } from "lucide-react"
+import { Bell, Check, Clock, Trash2, RefreshCw } from "lucide-react"
 
 export default function NotificationsPage() {
-  const { notifications, markNotificationAsRead, markAllNotificationsAsRead } = useAuth()
+  const { 
+    notifications, 
+    unreadCount, 
+    isLoading, 
+    markAsRead, 
+    markAllAsRead, 
+    deleteNotification, 
+    refreshNotifications 
+  } = useNotifications()
   const { toast } = useToast()
 
-  const handleMarkAsRead = (id: string) => {
-    markNotificationAsRead(id)
-    toast({
-      title: "Notificación marcada como leída",
-      description: "La notificación ha sido actualizada.",
-    })
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await markAsRead(id)
+      toast({
+        title: "Notificación marcada como leída",
+        description: "La notificación ha sido actualizada.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo marcar la notificación como leída.",
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleMarkAllAsRead = () => {
-    markAllNotificationsAsRead()
-    toast({
-      title: "Todas las notificaciones marcadas como leídas",
-      description: "Se han actualizado todas las notificaciones.",
-    })
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllAsRead()
+      toast({
+        title: "Todas las notificaciones marcadas como leídas",
+        description: "Se han actualizado todas las notificaciones.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron marcar todas las notificaciones como leídas.",
+        variant: "destructive"
+      })
+    }
   }
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const handleDeleteNotification = async (id: string) => {
+    try {
+      await deleteNotification(id)
+      toast({
+        title: "Notificación eliminada",
+        description: "La notificación ha sido eliminada exitosamente.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la notificación.",
+        variant: "destructive"
+      })
+    }
+  }
 
-  const formatTime = (date: Date) => {
+  const handleRefresh = async () => {
+    try {
+      await refreshNotifications()
+      toast({
+        title: "Notificaciones actualizadas",
+        description: "Se han cargado las últimas notificaciones.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar las notificaciones.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
     const now = new Date()
     const diff = now.getTime() - date.getTime()
     const minutes = Math.floor(diff / (1000 * 60))
@@ -47,6 +102,28 @@ export default function NotificationsPage() {
     }
   }
 
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'welcome':
+        return '👋'
+      case 'product_created':
+        return '📦'
+      case 'rental_created':
+      case 'rental_request':
+        return '📝'
+      case 'rental_confirmed':
+        return '✅'
+      case 'rental_cancelled':
+        return '❌'
+      case 'product_rented':
+        return '🎉'
+      case 'system':
+        return '📢'
+      default:
+        return '🔔'
+    }
+  }
+
   return (
     <ProtectedRoute>
       <div className="flex h-screen bg-gray-50">
@@ -59,11 +136,23 @@ export default function NotificationsPage() {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Notificaciones</h1>
                 <p className="text-gray-600">Mantente al día con las últimas actualizaciones</p>
               </div>
-              {unreadCount > 0 && (
-                <Button onClick={handleMarkAllAsRead} variant="outline">
-                  Marcar todas como leídas
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleRefresh} 
+                  variant="outline" 
+                  size="sm"
+                  disabled={isLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                  Actualizar
                 </Button>
-              )}
+                {unreadCount > 0 && (
+                  <Button onClick={handleMarkAllAsRead} variant="outline">
+                    <Check className="h-4 w-4 mr-2" />
+                    Marcar todas como leídas
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Stats */}
@@ -104,13 +193,14 @@ export default function NotificationsPage() {
               ) : (
                 notifications.map((notification) => (
                   <Card
-                    key={notification.id}
+                    key={notification._id}
                     className={`transition-all ${notification.read ? "bg-white" : "bg-blue-50 border-blue-200"}`}
                   >
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
+                            <span className="text-xl">{getNotificationIcon(notification.type)}</span>
                             <h3 className="font-semibold text-gray-900">{notification.title}</h3>
                             {!notification.read && (
                               <Badge variant="default" className="text-xs">
@@ -120,13 +210,23 @@ export default function NotificationsPage() {
                           </div>
                           <p className="text-gray-600 mb-3">{notification.message}</p>
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-500">{formatTime(notification.timestamp)}</span>
-                            {!notification.read && (
-                              <Button variant="ghost" size="sm" onClick={() => handleMarkAsRead(notification.id)}>
-                                <Check className="h-4 w-4 mr-1" />
-                                Marcar como leída
+                            <span className="text-sm text-gray-500">{formatTime(notification.createdAt)}</span>
+                            <div className="flex gap-2">
+                              {!notification.read && (
+                                <Button variant="ghost" size="sm" onClick={() => handleMarkAsRead(notification._id)}>
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Marcar como leída
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleDeleteNotification(notification._id)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
-                            )}
+                            </div>
                           </div>
                         </div>
                       </div>

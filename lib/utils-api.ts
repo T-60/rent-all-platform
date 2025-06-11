@@ -26,8 +26,13 @@ export function reverseTranslateCategory(category: string): string {
 }
 
 export function getImageUrl(imagePath: string): string {
-  if (!imagePath) {
-    console.warn('⚠️ No se proporcionó ruta de imagen, usando placeholder');
+  // Validaciones más estrictas
+  if (!imagePath || 
+      imagePath === 'undefined' || 
+      imagePath === 'null' || 
+      imagePath === '' ||
+      typeof imagePath !== 'string') {
+    console.warn('⚠️ Ruta de imagen inválida, usando placeholder:', { imagePath, type: typeof imagePath });
     return '/placeholder-product.svg';
   }
   
@@ -44,12 +49,28 @@ export function getImageUrl(imagePath: string): string {
   const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
   const fullUrl = `${backendUrl}${cleanPath}`;
   
+  // Validar que la ruta parece ser una imagen
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.PNG', '.JPG', '.JPEG'];
+  const hasImageExtension = imageExtensions.some(ext => 
+    cleanPath.toLowerCase().includes(ext.toLowerCase())
+  );
+  
+  if (!hasImageExtension) {
+    console.warn('⚠️ La ruta no parece ser una imagen válida, usando placeholder:', {
+      imagePath,
+      cleanPath,
+      fullUrl
+    });
+    return '/placeholder-product.svg';
+  }
+  
   console.log('🖼️ Construyendo URL de imagen:', { 
     imagePath, 
     cleanPath,
     apiUrl,
     backendUrl,
     fullUrl,
+    hasImageExtension,
     timestamp: new Date().toISOString()
   });
   
