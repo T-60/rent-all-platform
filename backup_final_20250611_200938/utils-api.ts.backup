@@ -43,7 +43,7 @@ export function getImageUrl(imagePath: string): string {
   
   // URL del backend (sin /api para imágenes estáticas)
   // TEMPORAL: Para red local usar IP específica en lugar de localhost
-  const apiUrl = 'http://192.168.0.105:3001/api'; // Configuración temporal para red local
+  const apiUrl = 'http://192.168.1.172:3001/api'; // Configuración temporal para red local
   const backendUrl = apiUrl.replace('/api', ''); // Remover /api para imágenes estáticas
   
   // Asegurar que la ruta empiece con /

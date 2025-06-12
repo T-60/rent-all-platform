@@ -166,21 +166,46 @@ router.get('/', optionalAuth, async (req, res) => {
 
     // Ejecutar consulta con paginación
     const skip = (page - 1) * limit;
-    const products = await Product.find(filters)
+    let products = await Product.find(filters)
       .populate('owner', 'name email avatar location')
       .sort(sortOptions)
       .skip(skip)
       .limit(Number(limit));
 
-    const totalProducts = await Product.countDocuments(filters);
-    const totalPages = Math.ceil(totalProducts / limit);
+    // 🎯 NUEVA FUNCIONALIDAD: Filtrar productos con alquileres activos
+    const Rental = require('../models/Rental');
+    
+    // Obtener IDs de productos que tienen alquileres confirmados o activos
+    const rentedProductIds = await Rental.distinct('product', {
+      status: { $in: ['confirmed', 'active'] }
+    });
+
+    // Filtrar productos para excluir los que están siendo alquilados
+    const availableProducts = products.filter(product => 
+      !rentedProductIds.some(rentedId => rentedId.toString() === product._id.toString())
+    );
+
+    console.log(`📦 Productos filtrados: ${products.length} total, ${availableProducts.length} disponibles, ${products.length - availableProducts.length} alquilados`);
+    
+    products = availableProducts;
+
+    // Recalcular total de productos disponibles (sin alquileres activos)
+    // Primero obtenemos todos los productos que coinciden con los filtros
+    const allMatchingProducts = await Product.find(filters).select('_id');
+    
+    // Filtramos los que no están alquilados
+    const actuallyAvailableCount = allMatchingProducts.filter(product => 
+      !rentedProductIds.some(rentedId => rentedId.toString() === product._id.toString())
+    ).length;
+
+    const totalPages = Math.ceil(actuallyAvailableCount / limit);
 
     res.json({
       products,
       pagination: {
         currentPage: Number(page),
         totalPages,
-        totalProducts,
+        totalProducts: actuallyAvailableCount,
         hasNextPage: page < totalPages,
         hasPrevPage: page > 1
       }
