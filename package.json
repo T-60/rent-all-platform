@@ -5,16 +5,32 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:network": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    
     "setup": "cp .env.example .env.local && pnpm install && cd backend && npm install",
-    "verify": "./verify-setup.sh",
+    "setup:quick": "pnpm install && cd backend && npm install",
+    
+    "backend": "cd backend && node server.js",
+    "backend:dev": "cd backend && npm run dev",
+    
+    "demo": "./start-demo.sh",
+    "demo:windows": "start-demo.bat",
+    
+    "full-dev": "concurrently \"cd backend && node server.js\" \"pnpm dev:network\"",
+    "full-dev:local": "concurrently \"cd backend && node server.js\" \"pnpm dev\"",
+    
     "test-data": "node create-test-user.js",
-    "backend": "cd backend && npm start",
-    "full-dev": "concurrently \"cd backend && npm start\" \"pnpm dev\"",
+    "health-check": "curl http://localhost:3001/api/health",
+    
     "clean": "rm -rf .next node_modules backend/node_modules",
-    "reinstall": "pnpm run clean && pnpm install && cd backend && npm install"
+    "clean:cache": "rm -rf .next",
+    "reinstall": "pnpm run clean && pnpm install && cd backend && npm install",
+    
+    "postinstall": "echo '✅ Instalación completada. Ejecuta: pnpm demo'"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

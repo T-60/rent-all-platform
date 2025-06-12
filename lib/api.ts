@@ -1,7 +1,32 @@
 // Servicio API para conectar con el backend
-// TEMPORAL: Configuración para pruebas en red local
-const API_URL = 'http://192.168.0.105:3001/api';
-console.log('🔧 API_URL configurada como:', API_URL);
+// CONFIGURACIÓN ADAPTATIVA PARA PRESENTACIÓN UNIVERSITARIA
+
+// Función para detectar la IP local automáticamente
+function getLocalIP(): string {
+  // En el navegador, usar la IP actual del host
+  if (typeof window !== 'undefined') {
+    return window.location.hostname;
+  }
+  // Fallback para server-side
+  return 'localhost';
+}
+
+// Configuración adaptativa de API
+const getApiUrl = (): string => {
+  const hostname = getLocalIP();
+  
+  // Si estamos en localhost, usar localhost
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:3001/api';
+  }
+  
+  // Para cualquier otra IP (red universitaria, hotspot, etc.)
+  return `http://${hostname}:3001/api`;
+};
+
+const API_URL = getApiUrl();
+console.log('🔧 API_URL configurada automáticamente como:', API_URL);
+console.log('🌐 Detectada IP/hostname:', getLocalIP());
 
 // Tipos para las respuestas de la API
 export interface ApiResponse<T = any> {
