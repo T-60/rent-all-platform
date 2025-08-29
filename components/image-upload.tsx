@@ -36,9 +36,9 @@ export function ImageUpload({ onImageChange, currentImages = [], className, mult
         return
       }
 
-      // Validar tamaño (máximo 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Las imágenes deben ser menores a 5MB")
+      // Validar tamaño (máximo 25MB)
+      if (file.size > 25 * 1024 * 1024) {
+        alert("Las imágenes deben ser menores a 25MB")
         return
       }
 
@@ -119,7 +119,7 @@ export function ImageUpload({ onImageChange, currentImages = [], className, mult
           <p className="text-sm text-gray-600">
             Haz clic para seleccionar {multiple ? 'imágenes' : 'una imagen'}
             <br />
-            <span className="text-xs text-gray-500">JPG, PNG, GIF hasta 5MB {multiple ? '(máximo 5 imágenes)' : ''}</span>
+            <span className="text-xs text-gray-500">JPG, PNG, GIF hasta 25MB {multiple ? '(máximo 5 imágenes)' : ''}</span>
           </p>
         </div>
         

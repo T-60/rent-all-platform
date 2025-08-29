@@ -29,7 +29,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 2 * 1024 * 1024 // 2MB límite
+    fileSize: 10 * 1024 * 1024 // 10MB límite para avatares
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|webp/;
@@ -206,6 +206,156 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
     res.status(500).json({ 
       message: 'Error interno del servidor',
       error: error.message 
+    });
+  }
+});
+
+// ==============================================
+// 💙 WISHLIST ENDPOINTS (ANTES DE /:id PARA EVITAR CONFLICTOS)
+// ==============================================
+
+// Agregar producto a favoritos
+router.post('/favorites/:productId', authMiddleware, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const userId = req.user.id;
+
+    // Verificar que el producto existe
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Producto no encontrado'
+      });
+    }
+
+    // Verificar que no sea su propio producto
+    if (product.owner.toString() === userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No puedes agregar tus propios productos a favoritos. Los favoritos son para productos que deseas alquilar de otros usuarios.'
+      });
+    }
+
+    // Agregar a favoritos si no está ya
+    const user = await User.findById(userId);
+    if (!user.favoriteProducts.includes(productId)) {
+      user.favoriteProducts.push(productId);
+      await user.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Producto agregado a favoritos',
+      data: {
+        favoriteProducts: user.favoriteProducts
+      }
+    });
+  } catch (error) {
+    console.error('Error agregando a favoritos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// Quitar producto de favoritos
+router.delete('/favorites/:productId', authMiddleware, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    user.favoriteProducts = user.favoriteProducts.filter(
+      id => id.toString() !== productId
+    );
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Producto quitado de favoritos',
+      data: {
+        favoriteProducts: user.favoriteProducts
+      }
+    });
+  } catch (error) {
+    console.error('Error quitando de favoritos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// Obtener lista de favoritos
+router.get('/favorites', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+
+    const user = await User.findById(userId)
+      .populate({
+        path: 'favoriteProducts',
+        populate: {
+          path: 'owner',
+          select: 'name email'
+        },
+        options: {
+          limit: Number(limit),
+          skip: (Number(page) - 1) * Number(limit)
+        }
+      });
+
+    const totalFavorites = user.favoriteProducts.length;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        products: user.favoriteProducts,
+        pagination: {
+          currentPage: Number(page),
+          totalPages: Math.ceil(totalFavorites / Number(limit)),
+          totalItems: totalFavorites,
+          itemsPerPage: Number(limit)
+        },
+        total: totalFavorites
+      }
+    });
+  } catch (error) {
+    console.error('Error obteniendo favoritos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
+    });
+  }
+});
+
+// Verificar si un producto está en favoritos
+router.get('/favorites/check/:productId', authMiddleware, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    const isFavorite = user.favoriteProducts.includes(productId);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        isFavorite,
+        productId
+      }
+    });
+  } catch (error) {
+    console.error('Error verificando favorito:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: error.message
     });
   }
 });

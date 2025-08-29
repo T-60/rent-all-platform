@@ -44,6 +44,21 @@ export interface User {
   university?: string;
   role: string;
   avatar?: string;
+  favoriteProducts?: string[]; // IDs de productos favoritos
+}
+
+export interface WishlistResponse {
+  success: boolean;
+  data: {
+    products: Product[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+    };
+    total: number;
+  };
 }
 
 export interface AuthResponse {
@@ -501,6 +516,77 @@ class ApiService {
     });
 
     return this.handleResponse<{ message: string; deletedCount: number }>(response);
+  }
+
+  // ==============================================
+  // 💙 WISHLIST METHODS
+  // ==============================================
+
+  // Agregar producto a favoritos
+  async addToFavorites(productId: string): Promise<{ message: string; favoriteProducts: string[] }> {
+    try {
+      const response = await fetch(`${API_URL}/users/favorites/${productId}`, {
+        method: 'POST',
+        headers: this.getHeaders(true),
+      });
+
+      const result = await this.handleResponse<{ success: boolean; message: string; data: { favoriteProducts: string[] } }>(response);
+      
+      // Transformar la respuesta para que coincida con lo que espera el frontend
+      return {
+        message: result.message,
+        favoriteProducts: result.data.favoriteProducts
+      };
+    } catch (error: any) {
+      // Si es el error específico de productos propios, lo relanzamos para que el contexto lo maneje
+      if (error.message && error.message.includes('No puedes agregar tus propios productos a favoritos')) {
+        throw error;
+      }
+      // Para otros errores, también los relanzamos
+      throw error;
+    }
+  }
+
+  // Quitar producto de favoritos
+  async removeFromFavorites(productId: string): Promise<{ message: string; favoriteProducts: string[] }> {
+    const response = await fetch(`${API_URL}/users/favorites/${productId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(true),
+    });
+
+    const result = await this.handleResponse<{ success: boolean; message: string; data: { favoriteProducts: string[] } }>(response);
+    
+    // Transformar la respuesta para que coincida con lo que espera el frontend
+    return {
+      message: result.message,
+      favoriteProducts: result.data.favoriteProducts
+    };
+  }
+
+  // Obtener lista de favoritos
+  async getFavorites(page: number = 1, limit: number = 10): Promise<WishlistResponse> {
+    const response = await fetch(`${API_URL}/users/favorites?page=${page}&limit=${limit}`, {
+      method: 'GET',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<WishlistResponse>(response);
+  }
+
+  // Verificar si un producto está en favoritos
+  async checkIsFavorite(productId: string): Promise<{ isFavorite: boolean; productId: string }> {
+    const response = await fetch(`${API_URL}/users/favorites/check/${productId}`, {
+      method: 'GET',
+      headers: this.getHeaders(true),
+    });
+
+    const result = await this.handleResponse<{ success: boolean; data: { isFavorite: boolean; productId: string } }>(response);
+    
+    // Transformar la respuesta para que coincida con lo que espera el frontend
+    return {
+      isFavorite: result.data.isFavorite,
+      productId: result.data.productId
+    };
   }
 }
 

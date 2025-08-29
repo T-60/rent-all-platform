@@ -5,7 +5,9 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import { ProductsProvider } from "@/contexts/products-context"
 import { NotificationProvider } from "@/contexts/notification-context"
-import { Toaster } from "@/components/ui/toaster"
+import { WishlistProvider } from "@/contexts/WishlistContext"
+import { Toaster } from "sonner"
+import { NoSSR } from "@/components/no-ssr"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -24,12 +26,21 @@ export default function RootLayout({
     <html lang="es">
       <body className={inter.className}>
         <AuthProvider>
-          <ProductsProvider>
-            <NotificationProvider>
-              {children}
-              <Toaster />
-            </NotificationProvider>
-          </ProductsProvider>
+          <NoSSR>
+            <WishlistProvider>
+              <ProductsProvider>
+                <NotificationProvider>
+                  {children}
+                  <Toaster 
+                    position="top-center"
+                    expand={false}
+                    richColors
+                    closeButton
+                  />
+                </NotificationProvider>
+              </ProductsProvider>
+            </WishlistProvider>
+          </NoSSR>
         </AuthProvider>
       </body>
     </html>

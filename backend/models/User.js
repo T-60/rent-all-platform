@@ -51,7 +51,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     maxlength: [500, 'La biografía no puede exceder 500 caracteres'],
     default: ''
-  }
+  },
+  favoriteProducts: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product'
+  }]
 }, {
   timestamps: true
 });

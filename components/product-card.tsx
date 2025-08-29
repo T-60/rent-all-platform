@@ -2,8 +2,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { DirectImage } from "./direct-image"
 import { SimpleSmartImage } from "./simple-smart-image"
+import { HeartButton } from "./heart-button"
 import type { Product } from "@/lib/api"
 import { translateCategory } from "@/lib/utils-api"
 
@@ -31,6 +31,10 @@ export function ProductCard({ product }: ProductCardProps) {
           className="w-full h-full object-cover"
           debugId={`ProductCard-${product._id}`}
         />
+        {/* Heart button en esquina superior derecha */}
+        <div className="absolute top-2 right-2 z-10">
+          <HeartButton productId={product._id} size="sm" />
+        </div>
       </div>
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-2">

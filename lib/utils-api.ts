@@ -25,6 +25,16 @@ export function reverseTranslateCategory(category: string): string {
   return reverseTranslations[category as keyof typeof reverseTranslations] || category;
 }
 
+// Función para detectar la IP local automáticamente (compartida)
+function getLocalIP(): string {
+  // En el navegador, usar la IP actual del host
+  if (typeof window !== 'undefined') {
+    return window.location.hostname;
+  }
+  // Fallback para server-side
+  return 'localhost';
+}
+
 export function getImageUrl(imagePath: string): string {
   // Validaciones más estrictas
   if (!imagePath || 
@@ -41,10 +51,24 @@ export function getImageUrl(imagePath: string): string {
     return imagePath;
   }
   
-  // URL del backend (sin /api para imágenes estáticas)
-  // TEMPORAL: Para red local usar IP específica en lugar de localhost
-  const apiUrl = 'http://192.168.0.105:3001/api'; // Configuración temporal para red local
-  const backendUrl = apiUrl.replace('/api', ''); // Remover /api para imágenes estáticas
+  // Configuración adaptativa de backend URL (sin /api para imágenes estáticas)
+  const getBackendUrl = (): string => {
+    const hostname = getLocalIP();
+    
+    // Si estamos en localhost, usar localhost
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3001';
+    }
+    
+    // Para cualquier otra IP (red universitaria, hotspot, etc.)
+    return `http://${hostname}:3001`;
+  };
+
+  const backendUrl = getBackendUrl();
+  console.log('🖼️ Backend URL detectada automáticamente:', {
+    hostname: getLocalIP(),
+    backendUrl
+  });
   
   // Asegurar que la ruta empiece con /
   const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
@@ -68,10 +92,10 @@ export function getImageUrl(imagePath: string): string {
   console.log('🖼️ Construyendo URL de imagen:', { 
     imagePath, 
     cleanPath,
-    apiUrl,
     backendUrl,
     fullUrl,
     hasImageExtension,
+    hostname: getLocalIP(),
     timestamp: new Date().toISOString()
   });
   
