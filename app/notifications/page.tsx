@@ -6,7 +6,6 @@ import { useNotifications } from "@/contexts/notification-context"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
 import { Bell, Check, Clock, Trash2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
@@ -24,64 +23,36 @@ export default function NotificationsPage() {
   const handleMarkAsRead = async (id: string) => {
     try {
       await markAsRead(id)
-      toast({
-        title: "Notificación marcada como leída",
-        description: "La notificación ha sido actualizada.",
-      })
+      toast.success("Notificación marcada como leída")
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo marcar la notificación como leída.",
-        variant: "destructive"
-      })
+      toast.error("No se pudo marcar la notificación como leída")
     }
   }
 
   const handleMarkAllAsRead = async () => {
     try {
       await markAllAsRead()
-      toast({
-        title: "Todas las notificaciones marcadas como leídas",
-        description: "Se han actualizado todas las notificaciones.",
-      })
+      toast.success("Todas las notificaciones marcadas como leídas")
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron marcar todas las notificaciones como leídas.",
-        variant: "destructive"
-      })
+      toast.error("No se pudieron marcar todas las notificaciones como leídas")
     }
   }
 
   const handleDeleteNotification = async (id: string) => {
     try {
       await deleteNotification(id)
-      toast({
-        title: "Notificación eliminada",
-        description: "La notificación ha sido eliminada exitosamente.",
-      })
+      toast.success("Notificación eliminada exitosamente")
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la notificación.",
-        variant: "destructive"
-      })
+      toast.error("No se pudo eliminar la notificación")
     }
   }
 
   const handleRefresh = async () => {
     try {
       await refreshNotifications()
-      toast({
-        title: "Notificaciones actualizadas",
-        description: "Se han cargado las últimas notificaciones.",
-      })
+      toast.success("Notificaciones actualizadas correctamente")
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron actualizar las notificaciones.",
-        variant: "destructive"
-      })
+      toast.error("No se pudieron actualizar las notificaciones")
     }
   }
 
