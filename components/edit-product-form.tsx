@@ -10,10 +10,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/hooks/use-toast"
 import { ImageUpload } from "./image-upload"
 import { Edit } from "lucide-react"
 import { apiService, type Product } from "@/lib/api"
+import { toast } from "sonner"
 
 const categories = [
   { value: "electronics", label: "Electrónicos" },
@@ -33,7 +33,6 @@ export function EditProductForm({ product, onClose }: EditProductFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const { user } = useAuth()
-  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -66,18 +65,33 @@ export function EditProductForm({ product, onClose }: EditProductFormProps) {
 
       const response = await apiService.updateProduct(product._id, formData)
 
-      toast({
-        title: "¡Producto actualizado!",
-        description: "Los cambios han sido guardados exitosamente.",
+      toast.success('¡Producto actualizado! Los cambios han sido guardados exitosamente.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: 'white',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
       })
 
       onClose()
     } catch (error) {
       console.error("Error al actualizar producto:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el producto. Inténtalo de nuevo.",
-        variant: "destructive",
+      toast.error('Error: No se pudo actualizar el producto. Inténtalo de nuevo.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          color: 'white',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
       })
     } finally {
       setIsLoading(false)

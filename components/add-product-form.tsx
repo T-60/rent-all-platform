@@ -11,10 +11,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/hooks/use-toast"
 import { Plus } from "lucide-react"
 import { ImageUpload } from "./image-upload"
 import { apiService } from "@/lib/api"
+import { toast } from "sonner"
 
 const categories = [
   { value: "electronics", label: "Electrónicos" },
@@ -32,7 +32,6 @@ interface AddProductFormProps {
 export function AddProductForm({ onClose }: AddProductFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const { user } = useAuth()
-  const { toast } = useToast()
   const { addProductToList, refreshProducts } = useProducts()
   const [imageFiles, setImageFiles] = useState<File[]>([])
 
@@ -51,6 +50,115 @@ export function AddProductForm({ onClose }: AddProductFormProps) {
       const category = (formElement.elements.namedItem("category") as HTMLSelectElement)?.value
       const pickupAddress = (formElement.elements.namedItem("pickupAddress") as HTMLInputElement)?.value
       const returnAddress = (formElement.elements.namedItem("returnAddress") as HTMLInputElement)?.value
+
+      // 🔥 VALIDACIONES FRONTEND AMIGABLES
+      if (!title || title.trim().length < 3) {
+        toast('El título debe tener al menos 3 caracteres', {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          icon: '📝',
+        })
+        setIsLoading(false)
+        return
+      }
+
+      if (!description || description.trim().length < 10) {
+        toast('La descripción debe tener al menos 10 caracteres para explicar mejor tu producto', {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          icon: '📋',
+        })
+        setIsLoading(false)
+        return
+      }
+
+      if (!pricePerDay || pricePerDay <= 0) {
+        toast('Por favor, establece un precio válido por día', {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          icon: '💰',
+        })
+        setIsLoading(false)
+        return
+      }
+
+      if (!pickupAddress || pickupAddress.trim().length < 5) {
+        toast('La dirección de recogida debe tener al menos 5 caracteres', {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          icon: '📍',
+        })
+        setIsLoading(false)
+        return
+      }
+
+      if (!returnAddress || returnAddress.trim().length < 5) {
+        toast('La dirección de devolución debe tener al menos 5 caracteres', {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          icon: '🏠',
+        })
+        setIsLoading(false)
+        return
+      }
+
+      if (!category) {
+        toast('Por favor, selecciona una categoría para tu producto', {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          icon: '🏷️',
+        })
+        setIsLoading(false)
+        return
+      }
 
       // Agregar campos al FormData
       formData.append("title", title)
@@ -72,11 +180,17 @@ export function AddProductForm({ onClose }: AddProductFormProps) {
         addProductToList(response.product)
       }
 
-      toast({
-        title: "🎉 ¡Producto publicado exitosamente!",
-        description: "Tu producto ya está visible para otros estudiantes. Recibirás notificaciones cuando alguien esté interesado en alquilarlo.",
+      toast.success('🎉 ¡Producto publicado exitosamente! Tu producto ya está visible para otros estudiantes. Recibirás notificaciones cuando alguien esté interesado en alquilarlo.', {
         duration: 6000,
-        className: "bg-green-50 border-green-200 text-green-800",
+        position: 'top-center',
+        style: {
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: 'white',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
       })
 
       // Limpiar formulario
@@ -145,11 +259,17 @@ export function AddProductForm({ onClose }: AddProductFormProps) {
         errorDescription = "No se pudo conectar con el servidor. Verifica tu conexión a internet."
       }
       
-      toast({
-        title: errorTitle,
-        description: errorDescription,
-        variant: "destructive",
-        duration: 8000, // Más tiempo para leer el mensaje
+      toast.error(`${errorTitle}: ${errorDescription}`, {
+        duration: 8000,
+        position: 'top-center',
+        style: {
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          color: 'white',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
       })
     } finally {
       setIsLoading(false)

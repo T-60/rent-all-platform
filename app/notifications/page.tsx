@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Bell, Check, Clock, Trash2, RefreshCw } from "lucide-react"
+import { toast } from "sonner"
 
 export default function NotificationsPage() {
   const { 
@@ -19,7 +20,6 @@ export default function NotificationsPage() {
     deleteNotification, 
     refreshNotifications 
   } = useNotifications()
-  const { toast } = useToast()
 
   const handleMarkAsRead = async (id: string) => {
     try {

@@ -11,14 +11,13 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ShoppingBag } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import Link from "next/link"
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
   const { login, register } = useAuth()
   const router = useRouter()
-  const { toast } = useToast()
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -37,9 +36,9 @@ export default function AuthPage() {
 
       if (result.success) {
         console.log('✅ [AuthPage] Login exitoso, mostrando toast...')
-        toast({
-          title: "¡Bienvenido!",
-          description: "Has iniciado sesión correctamente.",
+        toast.success('¡Bienvenido! Has iniciado sesión correctamente.', {
+          duration: 3000,
+          position: 'top-center',
         })
         console.log('🚀 [AuthPage] Redirigiendo al dashboard...')
         // Agregar un pequeño delay para permitir que el estado se actualice
@@ -48,18 +47,16 @@ export default function AuthPage() {
         }, 100)
       } else {
         console.log('❌ [AuthPage] Login falló:', result.error)
-        toast({
-          title: "Error",
-          description: result.error || "Email o contraseña incorrectos.",
-          variant: "destructive",
+        toast.error(result.error || 'Email o contraseña incorrectos.', {
+          duration: 4000,
+          position: 'top-center',
         })
       }
     } catch (error: any) {
       console.error('❌ [AuthPage] Error inesperado en login:', error)
-      toast({
-        title: "Error",
-        description: "Error inesperado. Intenta nuevamente.",
-        variant: "destructive",
+      toast.error('Error inesperado. Intenta nuevamente.', {
+        duration: 4000,
+        position: 'top-center',
       })
     }
 
@@ -80,12 +77,76 @@ export default function AuthPage() {
 
     console.log('📧 [AuthPage] Datos de registro - Email:', email, 'Name:', name)
 
+    // 🔒 VALIDACIONES FRONTEND AMIGABLES
+    if (password.length < 8) {
+      console.log('❌ [AuthPage] Contraseña muy corta')
+      toast('Tu contraseña debe tener al menos 8 caracteres', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+          color: 'white',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
+        icon: '🔒',
+      })
+      setIsLoading(false)
+      return
+    }
+
+    if (name.trim().length < 2) {
+      toast('Por favor, ingresa un nombre válido (mínimo 2 caracteres)', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+          color: 'white',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
+        icon: '👤',
+      })
+      setIsLoading(false)
+      return
+    }
+
+    if (university.trim().length < 3) {
+      toast('Por favor, especifica tu universidad (mínimo 3 caracteres)', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+          color: 'white',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
+        icon: '🎓',
+      })
+      setIsLoading(false)
+      return
+    }
+
     if (password !== confirmPassword) {
       console.log('❌ [AuthPage] Las contraseñas no coinciden')
-      toast({
-        title: "Error",
-        description: "Las contraseñas no coinciden.",
-        variant: "destructive",
+      toast('Las contraseñas no coinciden. Verifica que sean iguales.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          color: 'white',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
+        icon: '❌',
       })
       setIsLoading(false)
       return
@@ -97,9 +158,17 @@ export default function AuthPage() {
 
       if (result.success) {
         console.log('✅ [AuthPage] Registro exitoso, mostrando toast...')
-        toast({
-          title: "¡Registro exitoso!",
-          description: "Tu cuenta ha sido creada correctamente.",
+        toast.success('¡Tu cuenta ha sido creada correctamente! 🎉', {
+          duration: 5000,
+          position: 'top-center',
+          style: {
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
         })
         console.log('🚀 [AuthPage] Redirigiendo al dashboard...')
         // Agregar un pequeño delay para permitir que el estado se actualice
@@ -108,18 +177,32 @@ export default function AuthPage() {
         }, 100)
       } else {
         console.log('❌ [AuthPage] Registro falló:', result.error)
-        toast({
-          title: "Error",
-          description: result.error || "Error al crear la cuenta. Intenta nuevamente.",
-          variant: "destructive",
+        toast.error(result.error || 'Error al crear la cuenta. Intenta nuevamente.', {
+          duration: 5000,
+          position: 'top-center',
+          style: {
+            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            color: 'white',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
         })
       }
     } catch (error: any) {
       console.error('❌ [AuthPage] Error inesperado en registro:', error)
-      toast({
-        title: "Error",
-        description: "Error inesperado. Intenta nuevamente.",
-        variant: "destructive",
+      toast.error('Error inesperado. Intenta nuevamente.', {
+        duration: 5000,
+        position: 'top-center',
+        style: {
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          color: 'white',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          fontSize: '14px',
+          fontWeight: '500',
+        },
       })
     }
 
