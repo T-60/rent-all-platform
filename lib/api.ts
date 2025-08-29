@@ -13,6 +13,12 @@ function getLocalIP(): string {
 
 // Configuración adaptativa de API
 const getApiUrl = (): string => {
+  // Priorizar variable de entorno NEXT_PUBLIC_API_URL
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    console.log('🌟 Usando NEXT_PUBLIC_API_URL desde variable de entorno:', process.env.NEXT_PUBLIC_API_URL);
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
   const hostname = getLocalIP();
   
   // Si estamos en localhost, usar localhost

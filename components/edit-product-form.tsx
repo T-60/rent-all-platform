@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ImageUpload } from "./image-upload"
 import { Edit } from "lucide-react"
 import { apiService, type Product } from "@/lib/api"
+import { getImageUrl } from "@/lib/utils-api"
 import { toast } from "sonner"
 
 const categories = [
@@ -112,7 +113,7 @@ export function EditProductForm({ product, onClose }: EditProductFormProps) {
           {/* Imagen del producto */}
           <ImageUpload 
             onImageChange={(files) => setImageFiles(files)} 
-            currentImages={product.images.map(img => `http://localhost:3001${img}`)} 
+            currentImages={product.images.map(img => getImageUrl(img))} 
           />
 
           {/* Información básica */}

@@ -53,6 +53,15 @@ export function getImageUrl(imagePath: string): string {
   
   // Configuración adaptativa de backend URL (sin /api para imágenes estáticas)
   const getBackendUrl = (): string => {
+    // Priorizar variable de entorno, removiendo /api si existe para imágenes estáticas
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      const envUrl = process.env.NEXT_PUBLIC_API_URL;
+      // Si la URL termina en /api, removerlo para imágenes estáticas
+      const baseUrl = envUrl.endsWith('/api') ? envUrl.replace('/api', '') : envUrl;
+      console.log('🌟 Usando URL base desde variable de entorno para imágenes:', baseUrl);
+      return baseUrl;
+    }
+    
     const hostname = getLocalIP();
     
     // Si estamos en localhost, usar localhost
