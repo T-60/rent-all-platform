@@ -13,6 +13,7 @@ export default function HomePage() {
             <div className="flex items-center space-x-2">
               <ShoppingBag className="h-8 w-8 text-blue-600" />
               <span className="text-2xl font-bold text-gray-900">RENT+ALL</span>
+              <span className="text-xs bg-green-500 text-white px-2 py-1 rounded">v2.0 - Sync Test ✅</span>
             </div>
             <div className="space-x-4">
               <Button variant="ghost" asChild>

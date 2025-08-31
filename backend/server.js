@@ -180,11 +180,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Conectar a MongoDB Atlas
+// Conectar a MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log('✅ Conectado a MongoDB Atlas exitosamente');
-    console.log(`🌍 Base de datos: rent-all-platform`);
+    const isLocal = process.env.MONGODB_URI.includes('localhost');
+    const dbType = isLocal ? 'MongoDB Local' : 'MongoDB Atlas';
+    const dbLocation = isLocal ? 'localhost:27017' : 'Atlas Cloud';
+    
+    console.log(`✅ Conectado a ${dbType} exitosamente`);
+    console.log(`🌍 Base de datos: rent-all-platform (${dbLocation})`);
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor backend corriendo en puerto ${PORT}`);
       console.log(`💬 Socket.io habilitado para chat en tiempo real`);
@@ -194,8 +198,14 @@ mongoose.connect(process.env.MONGODB_URI)
     });
   })
   .catch(err => {
-    console.error('❌ Error conectando a MongoDB Atlas:', err.message);
+    const isLocal = process.env.MONGODB_URI && process.env.MONGODB_URI.includes('localhost');
+    const dbType = isLocal ? 'MongoDB Local' : 'MongoDB Atlas';
+    
+    console.error(`❌ Error conectando a ${dbType}:`, err.message);
     console.log('🔧 Revisa tu MONGODB_URI en el archivo .env');
+    if (isLocal) {
+      console.log('💡 Asegúrate de que MongoDB esté corriendo localmente en puerto 27017');
+    }
     process.exit(1);
   });
 

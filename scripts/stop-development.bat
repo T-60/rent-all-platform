@@ -1,23 +1,50 @@
 @echo off
-REM 🛑 SCRIPT PARA PARAR TODO EL ENTORNO DE DESARROLLO
+echo ========================================
+echo RENT-ALL - DETENER DESARROLLO
+echo ========================================
+echo.
 
-echo 🛑 PARANDO ENTORNO DE DESARROLLO...
+echo Deteniendo todos los procesos de Node.js...
+taskkill /f /im node.exe >nul 2>&1
 
-REM 1. Parar todos los procesos Node.js
-echo 🔧 Parando todos los procesos Node.js...
-taskkill /F /IM node.exe /T >NUL 2>&1
-if %errorlevel%==0 (
-    echo ✅ Procesos Node.js parados
-) else (
-    echo ℹ️ No había procesos Node.js corriendo
-)
+echo Deteniendo MongoDB local...
+taskkill /f /im mongod.exe >nul 2>&1
 
-REM 2. Parar procesos específicos de Next.js
-echo 🎨 Parando procesos Next.js...
-taskkill /F /FI "WINDOWTITLE eq npm*" /T >NUL 2>&1
+echo Deteniendo procesos en puertos 3000 y 3001...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3000') do taskkill /f /pid %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3001') do taskkill /f /pid %%a >nul 2>&1
 
-REM 3. Limpiar logs de desarrollo
-echo 🧹 Limpiando logs de desarrollo...
+echo Deteniendo procesos en puerto 27017 (MongoDB)...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :27017') do taskkill /f /pid %%a >nul 2>&1
+
+echo.
+echo Todos los servicios han sido detenidos:
+echo   - MongoDB (puerto 27017)
+echo   - Backend (puerto 3001) 
+echo   - Frontend (puerto 3000)
+echo.
+echo Puertos liberados correctamente
+echo.
+
+pause====================================
+echo 🛑 RENT-ALL - DETENER DESARROLLO
+echo ========================================
+echo.
+
+echo � Deteniendo todos los procesos de Node.js...
+taskkill /f /im node.exe >nul 2>&1
+taskkill /f /im "Next.js" >nul 2>&1
+
+echo 🛑 Deteniendo procesos en puertos 3000 y 3001...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3000') do taskkill /f /pid %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3001') do taskkill /f /pid %%a >nul 2>&1
+
+echo.
+echo ✅ Todos los servicios han sido detenidos
+echo ✅ Puertos 3000 y 3001 liberados
+echo.
+
+pause
 if exist dev-backend.log del /q dev-backend.log >NUL 2>&1
 if exist dev-frontend.log del /q dev-frontend.log >NUL 2>&1
 

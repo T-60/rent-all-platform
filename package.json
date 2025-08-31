@@ -8,6 +8,8 @@
     "dev:network": "next dev --hostname 0.0.0.0",
     "dev:full": "./scripts/start-development.sh",
     "dev:full:windows": "scripts\\start-development.bat",
+    "dev:background": "scripts\\dev-background.bat",
+    "dev:single": "scripts\\start-dev-simple.bat",
     "dev:simple": "scripts\\dev-simple.bat",
     "dev:ps": "powershell -ExecutionPolicy Bypass -File scripts\\start-dev.ps1",
     "dev:setup": "copy .env.development .env.local && npm install --legacy-peer-deps && cd backend && npm install && cd ..",
