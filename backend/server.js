@@ -18,7 +18,26 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000", "http://34.23.76.150:8080", "http://34.23.76.150:3000"],
+    origin: function(origin, callback) {
+      // Permitir requests sin origin (apps móviles, Postman, etc.)
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = [
+        "http://localhost:3000",
+        "http://localhost:3001", 
+        process.env.CORS_ORIGIN,
+        process.env.NEXT_PUBLIC_API_URL?.replace('/api', ''),
+        "http://34.23.76.150:8080",
+        "http://34.23.76.150:3000"
+      ].filter(Boolean);
+      
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log('🚫 CORS blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ["GET", "POST"],
     credentials: true
   }
