@@ -3,7 +3,7 @@ REM 🛑 SCRIPT PARA PARAR TODO EL ENTORNO DE DESARROLLO
 
 echo 🛑 PARANDO ENTORNO DE DESARROLLO...
 
-REM 1. Parar procesos Node.js
+REM 1. Parar todos los procesos Node.js
 echo 🔧 Parando todos los procesos Node.js...
 taskkill /F /IM node.exe /T >NUL 2>&1
 if %errorlevel%==0 (
@@ -12,26 +12,34 @@ if %errorlevel%==0 (
     echo ℹ️ No había procesos Node.js corriendo
 )
 
-REM 2. Preguntar por MongoDB
-set /p mongodb="¿Parar MongoDB también? (y/n): "
-if /i "%mongodb%"=="y" (
-    echo 🗄️ Parando MongoDB...
-    net stop MongoDB >NUL 2>&1
-    if %errorlevel%==0 (
-        echo ✅ MongoDB parado
-    ) else (
-        taskkill /F /IM mongod.exe >NUL 2>&1
-        echo ✅ MongoDB forzado a parar
-    )
+REM 2. Parar procesos específicos de Next.js
+echo 🎨 Parando procesos Next.js...
+taskkill /F /FI "WINDOWTITLE eq npm*" /T >NUL 2>&1
+
+REM 3. Limpiar logs de desarrollo
+echo 🧹 Limpiando logs de desarrollo...
+if exist dev-backend.log del /q dev-backend.log >NUL 2>&1
+if exist dev-frontend.log del /q dev-frontend.log >NUL 2>&1
+
+REM 4. Verificar que los puertos estén libres
+echo � Verificando puertos...
+netstat -ano | findstr :3000 >NUL 2>&1
+if %errorlevel%==0 (
+    echo ⚠️ Puerto 3000 aún ocupado
 ) else (
-    echo 🗄️ MongoDB sigue corriendo
+    echo ✅ Puerto 3000 libre
 )
 
-REM 3. Limpiar logs
-echo 🧹 Limpiando logs de desarrollo...
-del /q dev-backend.log >NUL 2>&1
+netstat -ano | findstr :3001 >NUL 2>&1
+if %errorlevel%==0 (
+    echo ⚠️ Puerto 3001 aún ocupado
+) else (
+    echo ✅ Puerto 3001 libre
+)
 
 echo.
 echo ✅ ¡ENTORNO DE DESARROLLO PARADO!
+echo.
+echo 💡 Para volver a iniciar: npm run dev:full:windows
 echo.
 pause
