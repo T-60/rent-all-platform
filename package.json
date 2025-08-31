@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "next dev",
     "dev:network": "next dev --hostname 0.0.0.0",
+    "dev:full": "./scripts/start-development.sh",
+    "dev:full:windows": "./scripts/start-development.bat",
+    "dev:stop": "./scripts/stop-development.sh",
+    "dev:stop:windows": "./scripts/stop-development.bat",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
