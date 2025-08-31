@@ -4,8 +4,11 @@ import { useState, useEffect } from "react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Sidebar } from "@/components/sidebar"
 import { EditProductForm } from "@/components/edit-product-form"
+import { useFloatingChat } from "@/components/floating-chat-manager"
+import { ScheduleDeliveryModal } from "@/components/schedule-delivery-modal"
 import { useAuth } from "@/contexts/auth-context"
 import { useProducts } from "@/contexts/products-context"
+import { useChat } from "@/contexts/chat-context"
 import { apiService, type Product, type Rental } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -13,13 +16,15 @@ import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { User, Mail, GraduationCap, Package, Calendar, Clock, MapPin, Eye, Edit, Trash2, Loader2 } from "lucide-react"
+import { User, Mail, GraduationCap, Package, Calendar, Clock, MapPin, Eye, Edit, Trash2, Loader2, MessageCircle } from "lucide-react"
 import { SimpleSmartImage } from "@/components/simple-smart-image"
 
 export default function ProfilePage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const { removeProductFromList, refreshProducts } = useProducts()
+  const { unreadCount } = useChat()
+  const { openChat } = useFloatingChat()
   const [selectedRental, setSelectedRental] = useState<string | null>(null)
   const [ownedProducts, setOwnedProducts] = useState<Product[]>([])
   const [userRentals, setUserRentals] = useState<Rental[]>([])
@@ -28,6 +33,11 @@ export default function ProfilePage() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
   const [isLoadingRentals, setIsLoadingRentals] = useState(true)
   const [isLoadingOwnerRentals, setIsLoadingOwnerRentals] = useState(true)
+
+  // Estados para el modal de programación
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [scheduleModalType, setScheduleModalType] = useState<'delivery' | 'return'>('delivery')
+  const [activeScheduleRental, setActiveScheduleRental] = useState<any>(null)
 
   // Fetch user's owned products
   useEffect(() => {
@@ -73,6 +83,47 @@ export default function ProfilePage() {
 
     fetchOwnedProducts()
   }, [user, toast])
+
+  // Función para abrir el chat flotante
+  const handleOpenChat = (rental: any) => {
+    console.log('🔍 Debug rental data:', rental)
+    console.log('🔍 Debug user data:', user)
+    
+    // Determinar quién es el otro usuario con más validaciones
+    let otherUser = null
+
+    if (user?._id === rental.owner?._id || user?.id === rental.owner?._id) {
+      // Soy el propietario, el otro es el inquilino
+      otherUser = rental.renter
+      console.log('🔍 Soy propietario, otro usuario es renter:', otherUser)
+    } else {
+      // Soy el inquilino, el otro es el propietario
+      otherUser = rental.product?.owner || rental.owner
+      console.log('🔍 Soy inquilino, otro usuario es owner:', otherUser)
+    }
+
+    if (!otherUser || (!otherUser._id && !otherUser.id)) {
+      console.error('❌ No se pudo determinar el otro usuario:', { 
+        rental, 
+        user, 
+        otherUser,
+        rentalOwner: rental.owner,
+        rentalRenter: rental.renter,
+        productOwner: rental.product?.owner
+      })
+      return
+    }
+
+    openChat({
+      rentalId: rental._id,
+      productTitle: rental.product?.title || 'Producto',
+      otherUser: {
+        _id: otherUser._id || otherUser.id,
+        name: otherUser.name || 'Usuario',
+        avatar: otherUser.avatar
+      }
+    })
+  }
 
   // Fetch user's rentals
   useEffect(() => {
@@ -212,7 +263,7 @@ export default function ProfilePage() {
       
       toast({
         title: "Alquiler confirmado",
-        description: `Has confirmado el alquiler de "${productTitle}"`
+        description: `Has confirmado el alquiler de "${productTitle}". Ahora puedes coordinar la entrega.`
       })
     } catch (error) {
       console.error('Error confirming rental:', error)
@@ -249,6 +300,124 @@ export default function ProfilePage() {
       toast({
         title: "Error",
         description: "No se pudo rechazar el alquiler",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Función para programar entrega
+  const handleScheduleDelivery = (rental: any) => {
+    setActiveScheduleRental(rental)
+    setScheduleModalType('delivery')
+    setScheduleModalOpen(true)
+  }
+
+  // Función para programar devolución
+  const handleScheduleReturn = (rental: any) => {
+    setActiveScheduleRental(rental)
+    setScheduleModalType('return')
+    setScheduleModalOpen(true)
+  }
+
+  // Función para confirmar la programación desde el modal
+  const handleConfirmSchedule = async (dateTime: string) => {
+    if (!activeScheduleRental) return
+
+    try {
+      if (scheduleModalType === 'delivery') {
+        await apiService.scheduleDelivery(activeScheduleRental._id, dateTime)
+        
+        // Actualizar la lista local
+        setOwnerRentals(prev => prev.map(rental => 
+          rental._id === activeScheduleRental._id 
+            ? { ...rental, status: 'delivery_arranged', deliveryScheduledDate: dateTime }
+            : rental
+        ))
+        
+        toast({
+          title: "Entrega programada",
+          description: `Has programado la entrega de "${activeScheduleRental.product.title}" exitosamente`
+        })
+      } else {
+        await apiService.scheduleReturn(activeScheduleRental._id, dateTime)
+        
+        // Actualizar la lista local
+        setOwnerRentals(prev => prev.map(rental => 
+          rental._id === activeScheduleRental._id 
+            ? { ...rental, status: 'return_arranged', returnScheduledDate: dateTime }
+            : rental
+        ))
+        
+        toast({
+          title: "Devolución programada",
+          description: `Has programado la devolución de "${activeScheduleRental.product.title}" exitosamente`
+        })
+      }
+    } catch (error) {
+      console.error('Error scheduling:', error)
+      toast({
+        title: "Error",
+        description: `No se pudo programar la ${scheduleModalType === 'delivery' ? 'entrega' : 'devolución'}`,
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Función para confirmar entrega
+  const handleConfirmDelivery = async (rentalId: string, productTitle: string) => {
+    if (!confirm(`¿Confirmar que se ha entregado "${productTitle}"?`)) {
+      return
+    }
+
+    try {
+      await apiService.confirmDelivery(rentalId)
+      
+      // Actualizar la lista local
+      setOwnerRentals(prev => prev.map(rental => 
+        rental._id === rentalId 
+          ? { ...rental, status: 'active' }
+          : rental
+      ))
+      
+      toast({
+        title: "Entrega confirmada",
+        description: `Has confirmado la entrega de "${productTitle}". El alquiler está ahora activo.`
+      })
+    } catch (error) {
+      console.error('Error confirming delivery:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo confirmar la entrega",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Función para confirmar devolución
+  const handleConfirmReturn = async (rentalId: string, productTitle: string) => {
+    if (!confirm(`¿Confirmar que se ha devuelto "${productTitle}"?`)) {
+      return
+    }
+
+    try {
+      await apiService.confirmReturn(rentalId)
+      
+      // Actualizar la lista local
+      setOwnerRentals(prev => prev.map(rental => 
+        rental._id === rentalId 
+          ? { ...rental, status: 'completed' }
+          : rental
+      ))
+      
+      toast({
+        title: "Devolución confirmada",
+        description: `Has confirmado la devolución de "${productTitle}". El alquiler se ha completado exitosamente.`
+      })
+    } catch (error) {
+      console.error('Error confirming return:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo confirmar la devolución",
         variant: "destructive"
       })
     }
@@ -384,27 +553,50 @@ export default function ProfilePage() {
                                   <Badge 
                                     variant="outline" 
                                     className={
-                                      rental.status === 'active' 
+                                      rental.status === 'confirmed' 
                                         ? "text-green-600 border-green-600"
-                                        : rental.status === 'completed'
+                                        : rental.status === 'delivery_arranged'
                                         ? "text-blue-600 border-blue-600"
-                                        : "text-gray-600 border-gray-600"
+                                        : rental.status === 'active'
+                                        ? "text-orange-600 border-orange-600"
+                                        : rental.status === 'return_arranged'
+                                        ? "text-purple-600 border-purple-600"
+                                        : rental.status === 'completed'
+                                        ? "text-indigo-600 border-indigo-600"
+                                        : rental.status === 'pending'
+                                        ? "text-yellow-600 border-yellow-600"
+                                        : "text-red-600 border-red-600"
                                     }
                                   >
-                                    {rental.status === 'active' ? 'Activo' : 
-                                     rental.status === 'completed' ? 'Completado' : 
+                                    {rental.status === 'confirmed' ? 'Confirmado' : 
+                                     rental.status === 'delivery_arranged' ? 'Entrega Programada' :
+                                     rental.status === 'active' ? 'Activo' :
+                                     rental.status === 'return_arranged' ? 'Devolución Programada' :
+                                     rental.status === 'completed' ? 'Completado' :
                                      rental.status === 'pending' ? 'Pendiente' : 'Cancelado'}
                                   </Badge>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      setSelectedRental(selectedRental === rental._id ? null : rental._id)
-                                    }
-                                  >
-                                    <Eye className="h-4 w-4 mr-1" />
-                                    {selectedRental === rental._id ? "Ocultar" : "Ver"} Detalles
-                                  </Button>
+                                  <div className="flex space-x-2">
+                                    {(rental.status !== 'cancelled' && rental.status !== 'completed') && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleOpenChat(rental)}
+                                      >
+                                        <MessageCircle className="h-4 w-4 mr-1" />
+                                        Chat
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        setSelectedRental(selectedRental === rental._id ? null : rental._id)
+                                      }
+                                    >
+                                      <Eye className="h-4 w-4 mr-1" />
+                                      {selectedRental === rental._id ? "Ocultar" : "Ver"} Detalles
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -486,17 +678,25 @@ export default function ProfilePage() {
                                     className={
                                       rental.status === 'confirmed' 
                                         ? "text-green-600 border-green-600"
-                                        : rental.status === 'pending'
+                                        : rental.status === 'delivery_arranged'
+                                        ? "text-blue-600 border-blue-600"
+                                        : rental.status === 'active'
                                         ? "text-orange-600 border-orange-600"
-                                        : rental.status === 'cancelled'
-                                        ? "text-red-600 border-red-600"
-                                        : "text-gray-600 border-gray-600"
+                                        : rental.status === 'return_arranged'
+                                        ? "text-purple-600 border-purple-600"
+                                        : rental.status === 'completed'
+                                        ? "text-indigo-600 border-indigo-600"
+                                        : rental.status === 'pending'
+                                        ? "text-yellow-600 border-yellow-600"
+                                        : "text-red-600 border-red-600"
                                     }
                                   >
                                     {rental.status === 'confirmed' ? 'Confirmado' : 
-                                     rental.status === 'pending' ? 'Pendiente' : 
-                                     rental.status === 'cancelled' ? 'Rechazado' :
-                                     rental.status === 'active' ? 'Activo' : 'Completado'}
+                                     rental.status === 'delivery_arranged' ? 'Entrega Programada' :
+                                     rental.status === 'active' ? 'Activo' :
+                                     rental.status === 'return_arranged' ? 'Devolución Programada' :
+                                     rental.status === 'completed' ? 'Completado' :
+                                     rental.status === 'pending' ? 'Pendiente' : 'Cancelado'}
                                   </Badge>
                                   
                                   {rental.status === 'pending' && (
@@ -516,13 +716,129 @@ export default function ProfilePage() {
                                       >
                                         ✗ Rechazar
                                       </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleOpenChat(rental)}
+                                      >
+                                        <MessageCircle className="h-4 w-4 mr-1" />
+                                        Chat
+                                      </Button>
                                     </div>
                                   )}
                                   
                                   {rental.status === 'confirmed' && (
-                                    <div className="text-xs text-green-600 text-center bg-green-50 p-2 rounded">
-                                      ¡Alquiler confirmado!<br/>
-                                      Contacta a {rental.renter.name} para coordinar la entrega
+                                    <div className="flex flex-col space-y-1">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleScheduleDelivery(rental)}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                                      >
+                                        📅 Programar Entrega
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleOpenChat(rental)}
+                                      >
+                                        <MessageCircle className="h-4 w-4 mr-1" />
+                                        Chat
+                                      </Button>
+                                      <div className="text-xs text-green-600 text-center bg-green-50 p-2 rounded">
+                                        ¡Alquiler confirmado!<br/>
+                                        Programa la entrega
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {rental.status === 'delivery_arranged' && (
+                                    <div className="flex flex-col space-y-1">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleConfirmDelivery(rental._id, rental.product.title)}
+                                        className="bg-orange-600 hover:bg-orange-700 text-white"
+                                      >
+                                        ✓ Confirmar Entrega
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleOpenChat(rental)}
+                                      >
+                                        <MessageCircle className="h-4 w-4 mr-1" />
+                                        Chat
+                                      </Button>
+                                      {rental.deliveryScheduledDate && (
+                                        <div className="text-xs text-blue-600 text-center bg-blue-50 p-2 rounded">
+                                          Entrega programada:<br/>
+                                          {new Date(rental.deliveryScheduledDate).toLocaleDateString('es-ES')}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {rental.status === 'active' && (
+                                    <div className="flex flex-col space-y-1">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleScheduleReturn(rental)}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                                      >
+                                        📅 Programar Devolución
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleOpenChat(rental)}
+                                      >
+                                        <MessageCircle className="h-4 w-4 mr-1" />
+                                        Chat
+                                      </Button>
+                                      <div className="text-xs text-orange-600 text-center bg-orange-50 p-2 rounded">
+                                        Alquiler activo<br/>
+                                        Producto en uso
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {rental.status === 'return_arranged' && (
+                                    <div className="flex flex-col space-y-1">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleConfirmReturn(rental._id, rental.product.title)}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                      >
+                                        ✓ Confirmar Devolución
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleOpenChat(rental)}
+                                      >
+                                        <MessageCircle className="h-4 w-4 mr-1" />
+                                        Chat
+                                      </Button>
+                                      {rental.returnScheduledDate && (
+                                        <div className="text-xs text-purple-600 text-center bg-purple-50 p-2 rounded">
+                                          Devolución programada:<br/>
+                                          {new Date(rental.returnScheduledDate).toLocaleDateString('es-ES')}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {rental.status === 'completed' && (
+                                    <div className="flex flex-col space-y-1">
+                                      <div className="text-xs text-indigo-600 text-center bg-indigo-50 p-2 rounded">
+                                        ✅ Alquiler completado<br/>
+                                        ¡Gracias por usar RentAll!
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {rental.status === 'cancelled' && (
+                                    <div className="text-xs text-red-600 text-center bg-red-50 p-2 rounded">
+                                      ❌ Alquiler cancelado
                                     </div>
                                   )}
                                 </div>
@@ -652,22 +968,55 @@ export default function ProfilePage() {
                           <Badge 
                             variant="outline" 
                             className={
-                              selectedRentalDetails.status === 'active' 
+                              selectedRentalDetails.status === 'confirmed' 
                                 ? "text-green-600 border-green-600"
-                                : selectedRentalDetails.status === 'completed'
+                                : selectedRentalDetails.status === 'delivery_arranged'
                                 ? "text-blue-600 border-blue-600"
-                                : "text-gray-600 border-gray-600"
+                                : selectedRentalDetails.status === 'active'
+                                ? "text-orange-600 border-orange-600"
+                                : selectedRentalDetails.status === 'return_arranged'
+                                ? "text-purple-600 border-purple-600"
+                                : selectedRentalDetails.status === 'completed'
+                                ? "text-indigo-600 border-indigo-600"
+                                : selectedRentalDetails.status === 'pending'
+                                ? "text-yellow-600 border-yellow-600"
+                                : "text-red-600 border-red-600"
                             }
                           >
-                            {selectedRentalDetails.status === 'active' ? 'Activo' : 
-                             selectedRentalDetails.status === 'completed' ? 'Completado' : 
+                            {selectedRentalDetails.status === 'confirmed' ? 'Confirmado' : 
+                             selectedRentalDetails.status === 'delivery_arranged' ? 'Entrega Programada' :
+                             selectedRentalDetails.status === 'active' ? 'Activo' :
+                             selectedRentalDetails.status === 'return_arranged' ? 'Devolución Programada' :
+                             selectedRentalDetails.status === 'completed' ? 'Completado' :
                              selectedRentalDetails.status === 'pending' ? 'Pendiente' : 'Cancelado'}
                           </Badge>
                         </div>
                       </div>
+                      {selectedRentalDetails.deliveryScheduledDate && (
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <p className="text-sm text-blue-800">
+                            <strong>Entrega programada:</strong> {new Date(selectedRentalDetails.deliveryScheduledDate).toLocaleString('es-ES')}
+                          </p>
+                        </div>
+                      )}
+                      {selectedRentalDetails.returnScheduledDate && (
+                        <div className="bg-purple-50 p-3 rounded-lg">
+                          <p className="text-sm text-purple-800">
+                            <strong>Devolución programada:</strong> {new Date(selectedRentalDetails.returnScheduledDate).toLocaleString('es-ES')}
+                          </p>
+                        </div>
+                      )}
                       <div className="bg-blue-50 p-3 rounded-lg">
                         <p className="text-sm text-blue-800">
-                          <strong>Recordatorio:</strong> Contacta al propietario para coordinar la entrega y devolución del producto.
+                          <strong>Recordatorio:</strong> {
+                            selectedRentalDetails.status === 'pending' ? 'Esperando confirmación del propietario.' :
+                            selectedRentalDetails.status === 'confirmed' ? 'Alquiler confirmado. Esperando programación de entrega.' :
+                            selectedRentalDetails.status === 'delivery_arranged' ? 'Entrega programada. Contacta al propietario para coordinar.' :
+                            selectedRentalDetails.status === 'active' ? 'Producto en uso. Cuídalo y devuélvelo en buen estado.' :
+                            selectedRentalDetails.status === 'return_arranged' ? 'Devolución programada. Contacta al propietario para coordinar.' :
+                            selectedRentalDetails.status === 'completed' ? '¡Alquiler completado exitosamente! Gracias por usar RentAll.' :
+                            'Alquiler cancelado.'
+                          }
                         </p>
                       </div>
                     </CardContent>
@@ -692,6 +1041,19 @@ export default function ProfilePage() {
             </div>
           </div>
         </main>
+        
+        {/* Modal de programación de entrega/devolución */}
+        <ScheduleDeliveryModal
+          isOpen={scheduleModalOpen}
+          onClose={() => {
+            setScheduleModalOpen(false)
+            setActiveScheduleRental(null)
+            setScheduleModalType('delivery')
+          }}
+          onConfirm={handleConfirmSchedule}
+          type={scheduleModalType}
+          productTitle={activeScheduleRental?.product?.title || ''}
+        />
       </div>
     </ProtectedRoute>
   )

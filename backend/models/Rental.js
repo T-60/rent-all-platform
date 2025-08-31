@@ -39,7 +39,15 @@ const rentalSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: {
-      values: ['pending', 'confirmed', 'active', 'completed', 'cancelled'],
+      values: [
+        'pending',           // Solicitud pendiente de aprobación
+        'confirmed',         // Propietario confirmó la solicitud
+        'delivery_arranged', // Cita para entrega coordinada
+        'active',           // Producto entregado y en uso activo
+        'return_arranged',   // Cita para devolución coordinada
+        'completed',        // Alquiler completado exitosamente
+        'cancelled'         // Cancelado en cualquier momento
+      ],
       message: 'Estado inválido'
     },
     default: 'pending'
@@ -63,7 +71,50 @@ const rentalSchema = new mongoose.Schema({
   },
   deliveryAddress: {
     type: String
-  }
+  },
+  
+  // Nuevos campos para mejorar el flujo del alquiler
+  deliveryScheduledDate: {
+    type: Date,
+    default: null
+  },
+  actualDeliveryDate: {
+    type: Date,
+    default: null
+  },
+  returnScheduledDate: {
+    type: Date,
+    default: null
+  },
+  actualReturnDate: {
+    type: Date,
+    default: null
+  },
+  deliveryNotes: {
+    type: String,
+    maxlength: [300, 'Las notas de entrega no pueden exceder 300 caracteres']
+  },
+  returnNotes: {
+    type: String,
+    maxlength: [300, 'Las notas de devolución no pueden exceder 300 caracteres']
+  },
+  
+  // Historial de cambios de estado
+  statusHistory: [{
+    status: {
+      type: String,
+      enum: ['pending', 'confirmed', 'delivery_arranged', 'active', 'return_arranged', 'completed', 'cancelled']
+    },
+    changedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    changedAt: {
+      type: Date,
+      default: Date.now
+    },
+    notes: String
+  }]
 }, {
   timestamps: true
 });
@@ -87,6 +138,67 @@ rentalSchema.pre('save', function(next) {
   
   next();
 });
+
+// Métodos de instancia
+rentalSchema.methods.canTransitionTo = function(newStatus) {
+  const transitions = {
+    'pending': ['confirmed', 'cancelled'],
+    'confirmed': ['delivery_arranged', 'active', 'cancelled'],
+    'delivery_arranged': ['active', 'cancelled'],
+    'active': ['return_arranged', 'completed', 'cancelled'],
+    'return_arranged': ['completed', 'cancelled'],
+    'completed': [],
+    'cancelled': []
+  };
+  
+  return transitions[this.status]?.includes(newStatus) || false;
+};
+
+rentalSchema.methods.updateStatus = function(newStatus, changedBy, notes = null) {
+  if (!this.canTransitionTo(newStatus)) {
+    throw new Error(`No se puede cambiar de ${this.status} a ${newStatus}`);
+  }
+  
+  // Agregar al historial
+  this.statusHistory.push({
+    status: this.status, // estado anterior
+    changedBy,
+    changedAt: new Date(),
+    notes
+  });
+  
+  this.status = newStatus;
+  return this;
+};
+
+rentalSchema.methods.canUserChat = function(userId) {
+  // Chat disponible desde pending hasta antes de completed
+  const chatEnabledStatuses = ['pending', 'confirmed', 'delivery_arranged', 'active', 'return_arranged'];
+  
+  // Obtener IDs de los participantes
+  const renterId = this.renter._id ? this.renter._id.toString() : this.renter.toString();
+  const ownerId = this.owner._id ? this.owner._id.toString() : this.owner.toString();
+  const userIdStr = userId.toString();
+  
+  const isParticipant = renterId === userIdStr || ownerId === userIdStr;
+  
+  console.log(`🔍 canUserChat - Status: ${this.status}, User: ${userIdStr}, Renter: ${renterId}, Owner: ${ownerId}, IsParticipant: ${isParticipant}`);
+  
+  return chatEnabledStatuses.includes(this.status) && isParticipant;
+};
+
+// Métodos estáticos
+rentalSchema.statics.getValidTransitions = function() {
+  return {
+    'pending': ['confirmed', 'cancelled'],
+    'confirmed': ['delivery_arranged', 'active', 'cancelled'],
+    'delivery_arranged': ['active', 'cancelled'],
+    'active': ['return_arranged', 'completed', 'cancelled'],
+    'return_arranged': ['completed', 'cancelled'],
+    'completed': [],
+    'cancelled': []
+  };
+};
 
 // Índices para consultas eficientes
 rentalSchema.index({ renter: 1, createdAt: -1 });
