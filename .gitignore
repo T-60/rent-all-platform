@@ -19,9 +19,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env files - CONFIGURACIÓN SEGURA
 .env*
 !.env.example
+!.env.development
+# ⚠️ NUNCA sincronizar .env.production (contiene secretos de producción)
 
 # vercel
 .vercel
