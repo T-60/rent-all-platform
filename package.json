@@ -24,7 +24,9 @@
     "clean:cache": "rm -rf .next",
     "reinstall": "pnpm run clean && pnpm install && cd backend && npm install",
     "deploy:prod": "./scripts/deploy-production.sh",
+    "deploy:prod:silent": "./scripts/deploy-production-silent.sh",
     "setup:gcp": "./scripts/setup-gcp.sh",
+    "monitor": "./scripts/monitor.sh",
     "dev:prod": "cp .env.production .env.local && npm run build && npm start",
     "postinstall": "echo '✅ Instalación completada. Ejecuta: pnpm demo'"
   },
