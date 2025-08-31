@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
+const http = require('http');
+const { Server } = require('socket.io');
 require('dotenv').config();
 
 // Importar rutas
@@ -10,8 +12,18 @@ const productRoutes = require('./routes/products');
 const userRoutes = require('./routes/users');
 const rentalRoutes = require('./routes/rentals');
 const notificationRoutes = require('./routes/notifications');
+const chatRoutes = require('./routes/chat');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: ["http://localhost:3000", "http://34.23.76.150:8080", "http://34.23.76.150:3000"],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 
 // Middlewares
@@ -104,6 +116,10 @@ app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rentals', rentalRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/chat', chatRoutes);
+
+// Hacer io disponible en las rutas
+app.io = io;
 
 // Ruta de prueba
 app.get('/api/health', (req, res) => {
@@ -111,6 +127,28 @@ app.get('/api/health', (req, res) => {
     message: 'Backend funcionando correctamente!',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Socket.io configuration
+io.on('connection', (socket) => {
+  console.log('🔌 Usuario conectado:', socket.id);
+
+  // Unirse a una sala de alquiler específica
+  socket.on('join_rental', (rentalId) => {
+    socket.join(`rental_${rentalId}`);
+    console.log(`👤 Usuario ${socket.id} se unió a rental_${rentalId}`);
+  });
+
+  // Salir de una sala de alquiler
+  socket.on('leave_rental', (rentalId) => {
+    socket.leave(`rental_${rentalId}`);
+    console.log(`👋 Usuario ${socket.id} salió de rental_${rentalId}`);
+  });
+
+  // Manejo de desconexión
+  socket.on('disconnect', () => {
+    console.log('🔌 Usuario desconectado:', socket.id);
   });
 });
 
@@ -128,8 +166,9 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('✅ Conectado a MongoDB Atlas exitosamente');
     console.log(`🌍 Base de datos: rent-all-platform`);
-    app.listen(PORT, '0.0.0.0', () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor backend corriendo en puerto ${PORT}`);
+      console.log(`💬 Socket.io habilitado para chat en tiempo real`);
       console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
       console.log(`🌐 Acceso en red: http://192.168.1.172:${PORT}/api/health`);
       console.log(`🏠 Para probar en otra PC: http://192.168.1.172:${PORT}`);
@@ -140,5 +179,7 @@ mongoose.connect(process.env.MONGODB_URI)
     console.log('🔧 Revisa tu MONGODB_URI en el archivo .env');
     process.exit(1);
   });
+
+module.exports = app;
 
 module.exports = app;

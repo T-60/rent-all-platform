@@ -6,6 +6,8 @@ import { AuthProvider } from "@/contexts/auth-context"
 import { ProductsProvider } from "@/contexts/products-context"
 import { NotificationProvider } from "@/contexts/notification-context"
 import { WishlistProvider } from "@/contexts/WishlistContext"
+import { ChatProvider } from "@/contexts/chat-context"
+import { FloatingChatManager } from "@/components/floating-chat-manager"
 import { Toaster } from "sonner"
 import { NoSSR } from "@/components/no-ssr"
 
@@ -30,13 +32,18 @@ export default function RootLayout({
             <WishlistProvider>
               <ProductsProvider>
                 <NotificationProvider>
-                  {children}
-                  <Toaster 
-                    position="top-center"
-                    expand={false}
-                    richColors
-                    closeButton
-                  />
+                  <ChatProvider>
+                    {children}
+                    <NoSSR>
+                      <FloatingChatManager />
+                    </NoSSR>
+                    <Toaster 
+                      position="top-center"
+                      expand={false}
+                      richColors
+                      closeButton
+                    />
+                  </ChatProvider>
                 </NotificationProvider>
               </ProductsProvider>
             </WishlistProvider>

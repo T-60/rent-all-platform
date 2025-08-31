@@ -121,7 +121,9 @@ export interface Rental {
   endDate: string;
   days: number;
   totalAmount: number;
-  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'delivery_arranged' | 'active' | 'return_arranged' | 'completed' | 'cancelled';
+  deliveryScheduledDate?: string;
+  returnScheduledDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -394,11 +396,53 @@ class ApiService {
   }
 
   // Actualizar estado de alquiler (confirmar, rechazar, etc.)
-  async updateRentalStatus(rentalId: string, status: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled'): Promise<{ rental: any; message: string }> {
+  async updateRentalStatus(rentalId: string, status: 'pending' | 'confirmed' | 'delivery_arranged' | 'active' | 'return_arranged' | 'completed' | 'cancelled'): Promise<{ rental: any; message: string }> {
     const response = await fetch(`${API_URL}/rentals/${rentalId}/status`, {
       method: 'PUT',
       headers: this.getHeaders(true),
       body: JSON.stringify({ status }),
+    });
+
+    return this.handleResponse<{ rental: any; message: string }>(response);
+  }
+
+  // Programar entrega
+  async scheduleDelivery(rentalId: string, deliveryDate: string): Promise<{ rental: any; message: string }> {
+    const response = await fetch(`${API_URL}/rentals/${rentalId}/schedule-delivery`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ deliveryDate }),
+    });
+
+    return this.handleResponse<{ rental: any; message: string }>(response);
+  }
+
+  // Confirmar entrega
+  async confirmDelivery(rentalId: string): Promise<{ rental: any; message: string }> {
+    const response = await fetch(`${API_URL}/rentals/${rentalId}/confirm-delivery`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<{ rental: any; message: string }>(response);
+  }
+
+  // Programar devolución
+  async scheduleReturn(rentalId: string, returnDate: string): Promise<{ rental: any; message: string }> {
+    const response = await fetch(`${API_URL}/rentals/${rentalId}/schedule-return`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ returnDate }),
+    });
+
+    return this.handleResponse<{ rental: any; message: string }>(response);
+  }
+
+  // Confirmar devolución
+  async confirmReturn(rentalId: string): Promise<{ rental: any; message: string }> {
+    const response = await fetch(`${API_URL}/rentals/${rentalId}/confirm-return`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
     });
 
     return this.handleResponse<{ rental: any; message: string }>(response);

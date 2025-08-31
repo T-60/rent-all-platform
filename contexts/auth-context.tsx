@@ -19,6 +19,7 @@ interface RegisterRequest {
 
 interface AuthContextType {
   user: User | null
+  token: string | null
   isAuthenticated: boolean
   isLoading: boolean
   login: (credentials: LoginRequest) => Promise<{ success: boolean; error?: string }>
@@ -42,6 +43,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
+  const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const isAuthenticated = !!user
@@ -49,18 +51,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Función para verificar si hay un usuario autenticado al cargar la app
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
+      const storedToken = localStorage.getItem('token')
+      if (!storedToken) {
         setIsLoading(false)
         return
       }
 
       const profileResponse = await apiService.getProfile()
       setUser(profileResponse.user)
+      setToken(storedToken)
     } catch (error) {
       console.error('Error checking authentication:', error)
       // Si hay error, limpiar el token
       localStorage.removeItem('token')
+      setToken(null)
     } finally {
       setIsLoading(false)
     }
@@ -79,6 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log('✅ Datos válidos recibidos');
         localStorage.setItem('token', response.token);
         setUser(response.user);
+        setToken(response.token);
         console.log('✅ Usuario configurado en contexto:', response.user);
         console.log('✅ Token guardado:', response.token.substring(0, 20) + '...');
         return { success: true };
@@ -124,6 +129,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log('✅ Datos válidos recibidos');
         localStorage.setItem('token', response.token);
         setUser(response.user);
+        setToken(response.token);
         console.log('✅ Usuario configurado en contexto:', response.user);
         console.log('✅ Token guardado:', response.token.substring(0, 20) + '...');
         return { success: true };
@@ -160,6 +166,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const handleLogout = () => {
     localStorage.removeItem('token')
     setUser(null)
+    setToken(null)
   }
 
   // Verificar autenticación al cargar la aplicación
@@ -169,6 +176,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value: AuthContextType = {
     user,
+    token,
     isAuthenticated,
     isLoading,
     login: handleLogin,

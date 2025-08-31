@@ -10,26 +10,19 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    
     "setup": "cp .env.example .env.local && pnpm install && cd backend && npm install",
     "setup:quick": "pnpm install && cd backend && npm install",
-    
     "backend": "cd backend && node server.js",
     "backend:dev": "cd backend && npm run dev",
-    
     "demo": "./start-demo.sh",
     "demo:windows": "start-demo.bat",
-    
     "full-dev": "concurrently \"cd backend && node server.js\" \"pnpm dev:network\"",
     "full-dev:local": "concurrently \"cd backend && node server.js\" \"pnpm dev\"",
-    
     "test-data": "node create-test-user.js",
     "health-check": "curl http://localhost:3001/api/health",
-    
     "clean": "rm -rf .next node_modules backend/node_modules",
     "clean:cache": "rm -rf .next",
     "reinstall": "pnpm run clean && pnpm install && cd backend && npm install",
-    
     "postinstall": "echo '✅ Instalación completada. Ejecuta: pnpm demo'"
   },
   "dependencies": {
@@ -79,6 +72,7 @@
     "react-hook-form": "^7.54.1",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
+    "socket.io-client": "^4.8.1",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",

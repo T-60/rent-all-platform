@@ -312,7 +312,12 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 // Actualizar estado del alquiler (solo propietario)
 router.put('/:id/status', authMiddleware, [
-  body('status').isIn(['pending', 'confirmed', 'active', 'completed', 'cancelled']).withMessage('Estado inválido')
+  body('status').isIn([
+    'pending', 'confirmed', 'delivery_arranged', 'active', 
+    'return_arranged', 'completed', 'cancelled'
+  ]).withMessage('Estado inválido'),
+  body('notes').optional().isLength({ max: 300 }).withMessage('Las notas no pueden exceder 300 caracteres'),
+  body('scheduledDate').optional().isISO8601().withMessage('Fecha programada inválida')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -341,22 +346,39 @@ router.put('/:id/status', authMiddleware, [
       });
     }
 
-    // Validar transiciones de estado
-    const validTransitions = {
-      'pending': ['confirmed', 'cancelled'],
-      'confirmed': ['active', 'cancelled'],
-      'active': ['completed', 'cancelled'],
-      'completed': [],
-      'cancelled': []
-    };
-
-    if (!validTransitions[rental.status].includes(status)) {
+    // Usar el método del modelo para validar transiciones
+    if (!rental.canTransitionTo(status)) {
       return res.status(400).json({ 
         message: `No se puede cambiar de ${rental.status} a ${status}` 
       });
     }
 
-    rental.status = status;
+    // Actualizar campos específicos según el nuevo estado
+    const { notes, scheduledDate } = req.body;
+    
+    switch (status) {
+      case 'delivery_arranged':
+        if (scheduledDate) {
+          rental.deliveryScheduledDate = new Date(scheduledDate);
+        }
+        if (notes) rental.deliveryNotes = notes;
+        break;
+      case 'active':
+        rental.actualDeliveryDate = new Date();
+        break;
+      case 'return_arranged':
+        if (scheduledDate) {
+          rental.returnScheduledDate = new Date(scheduledDate);
+        }
+        if (notes) rental.returnNotes = notes;
+        break;
+      case 'completed':
+        rental.actualReturnDate = new Date();
+        break;
+    }
+
+    // Actualizar estado usando el método del modelo
+    rental.updateStatus(status, req.user._id, notes);
     await rental.save();
 
     // Crear notificaciones según el nuevo estado
@@ -493,6 +515,184 @@ router.get('/availability/:productId', async (req, res) => {
       message: 'Error interno del servidor',
       error: error.message 
     });
+  }
+});
+
+// Ruta para programar entrega
+router.put('/:id/schedule-delivery', authMiddleware, [
+  body('scheduledDate').isISO8601().withMessage('Fecha programada requerida'),
+  body('notes').optional().isLength({ max: 300 }).withMessage('Las notas no pueden exceder 300 caracteres')
+], async (req, res) => {
+  try {
+    const { scheduledDate, notes } = req.body;
+    
+    const rental = await Rental.findById(req.params.id)
+      .populate('product', 'title')
+      .populate('renter', 'name email')
+      .populate('owner', 'name email');
+
+    if (!rental) {
+      return res.status(404).json({ message: 'Alquiler no encontrado' });
+    }
+
+    // Solo disponible en estado confirmed
+    if (rental.status !== 'confirmed') {
+      return res.status(400).json({ 
+        message: 'Solo se puede programar entrega para alquileres confirmados' 
+      });
+    }
+
+    // Verificar permisos (ambos participantes pueden programar)
+    const isParticipant = rental.owner._id.toString() === req.user._id.toString() || 
+                         rental.renter._id.toString() === req.user._id.toString();
+    
+    if (!isParticipant) {
+      return res.status(403).json({ message: 'No tienes permisos para esta acción' });
+    }
+
+    rental.deliveryScheduledDate = new Date(scheduledDate);
+    if (notes) rental.deliveryNotes = notes;
+    rental.updateStatus('delivery_arranged', req.user._id, `Entrega programada para ${scheduledDate}`);
+    
+    await rental.save();
+
+    res.json({
+      message: 'Entrega programada exitosamente',
+      rental: rental
+    });
+  } catch (error) {
+    console.error('Error programando entrega:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
+// Ruta para confirmar entrega
+router.put('/:id/confirm-delivery', authMiddleware, async (req, res) => {
+  try {
+    const rental = await Rental.findById(req.params.id)
+      .populate('product', 'title')
+      .populate('renter', 'name email')
+      .populate('owner', 'name email');
+
+    if (!rental) {
+      return res.status(404).json({ message: 'Alquiler no encontrado' });
+    }
+
+    // Puede ser confirmado desde confirmed o delivery_arranged
+    if (!['confirmed', 'delivery_arranged'].includes(rental.status)) {
+      return res.status(400).json({ 
+        message: 'No se puede confirmar entrega en el estado actual' 
+      });
+    }
+
+    // Solo el propietario puede confirmar la entrega
+    if (rental.owner._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        message: 'Solo el propietario puede confirmar la entrega' 
+      });
+    }
+
+    rental.actualDeliveryDate = new Date();
+    rental.updateStatus('active', req.user._id, 'Producto entregado');
+    
+    await rental.save();
+
+    res.json({
+      message: 'Entrega confirmada exitosamente',
+      rental: rental
+    });
+  } catch (error) {
+    console.error('Error confirmando entrega:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
+// Ruta para programar devolución
+router.put('/:id/schedule-return', authMiddleware, [
+  body('scheduledDate').isISO8601().withMessage('Fecha programada requerida'),
+  body('notes').optional().isLength({ max: 300 }).withMessage('Las notas no pueden exceder 300 caracteres')
+], async (req, res) => {
+  try {
+    const { scheduledDate, notes } = req.body;
+    
+    const rental = await Rental.findById(req.params.id)
+      .populate('product', 'title')
+      .populate('renter', 'name email')
+      .populate('owner', 'name email');
+
+    if (!rental) {
+      return res.status(404).json({ message: 'Alquiler no encontrado' });
+    }
+
+    // Solo disponible en estado active
+    if (rental.status !== 'active') {
+      return res.status(400).json({ 
+        message: 'Solo se puede programar devolución para alquileres activos' 
+      });
+    }
+
+    // Verificar permisos (ambos participantes pueden programar)
+    const isParticipant = rental.owner._id.toString() === req.user._id.toString() || 
+                         rental.renter._id.toString() === req.user._id.toString();
+    
+    if (!isParticipant) {
+      return res.status(403).json({ message: 'No tienes permisos para esta acción' });
+    }
+
+    rental.returnScheduledDate = new Date(scheduledDate);
+    if (notes) rental.returnNotes = notes;
+    rental.updateStatus('return_arranged', req.user._id, `Devolución programada para ${scheduledDate}`);
+    
+    await rental.save();
+
+    res.json({
+      message: 'Devolución programada exitosamente',
+      rental: rental
+    });
+  } catch (error) {
+    console.error('Error programando devolución:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
+// Ruta para confirmar devolución
+router.put('/:id/confirm-return', authMiddleware, async (req, res) => {
+  try {
+    const rental = await Rental.findById(req.params.id)
+      .populate('product', 'title')
+      .populate('renter', 'name email')
+      .populate('owner', 'name email');
+
+    if (!rental) {
+      return res.status(404).json({ message: 'Alquiler no encontrado' });
+    }
+
+    // Puede ser confirmado desde active o return_arranged
+    if (!['active', 'return_arranged'].includes(rental.status)) {
+      return res.status(400).json({ 
+        message: 'No se puede confirmar devolución en el estado actual' 
+      });
+    }
+
+    // Solo el propietario puede confirmar la devolución
+    if (rental.owner._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        message: 'Solo el propietario puede confirmar la devolución' 
+      });
+    }
+
+    rental.actualReturnDate = new Date();
+    rental.updateStatus('completed', req.user._id, 'Producto devuelto y alquiler completado');
+    
+    await rental.save();
+
+    res.json({
+      message: 'Devolución confirmada exitosamente. Alquiler completado.',
+      rental: rental
+    });
+  } catch (error) {
+    console.error('Error confirmando devolución:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
 
