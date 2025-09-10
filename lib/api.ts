@@ -122,6 +122,10 @@ export interface Rental {
   days: number;
   totalAmount: number;
   status: 'pending' | 'confirmed' | 'delivery_arranged' | 'active' | 'return_arranged' | 'completed' | 'cancelled';
+  paymentStatus: 'pending' | 'paid' | 'failed';
+  paymentIntentId?: string;
+  stripeSessionId?: string;
+  transactionId?: string;
   deliveryScheduledDate?: string;
   returnScheduledDate?: string;
   createdAt: string;
@@ -637,6 +641,43 @@ class ApiService {
       isFavorite: result.data.isFavorite,
       productId: result.data.productId
     };
+  }
+
+  // === FUNCIONES DE PAGO (STRIPE) ===
+
+  // Crear Payment Intent para un alquiler
+  async createPaymentIntent(rentalId: string): Promise<{ clientSecret: string; paymentIntentId: string }> {
+    const response = await fetch(`${API_URL}/payments/create-intent`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ rentalId }),
+    });
+
+    const result = await this.handleResponse<{ clientSecret: string; paymentIntentId: string }>(response);
+    return result;
+  }
+
+  // Confirmar pago exitoso
+  async confirmPayment(paymentIntentId: string): Promise<{ rental: Rental }> {
+    const response = await fetch(`${API_URL}/payments/confirm`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ paymentIntentId }),
+    });
+
+    const result = await this.handleResponse<{ rental: Rental }>(response);
+    return result;
+  }
+
+  // Obtener estado del pago de un alquiler
+  async getPaymentStatus(rentalId: string): Promise<{ paymentStatus: string; paymentIntentId?: string }> {
+    const response = await fetch(`${API_URL}/payments/status/${rentalId}`, {
+      method: 'GET',
+      headers: this.getHeaders(true),
+    });
+
+    const result = await this.handleResponse<{ paymentStatus: string; paymentIntentId?: string }>(response);
+    return result;
   }
 }
 
