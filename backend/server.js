@@ -13,6 +13,8 @@ const userRoutes = require('./routes/users');
 const rentalRoutes = require('./routes/rentals');
 const notificationRoutes = require('./routes/notifications');
 const chatRoutes = require('./routes/chat');
+const paymentRoutes = require('./routes/payments');
+const webhookRoutes = require('./routes/webhooks');
 
 const app = express();
 const server = http.createServer(app);
@@ -78,6 +80,11 @@ app.use(cors({
   credentials: true,
   optionsSuccessStatus: 200
 }));
+
+// Rutas - Webhooks ANTES de JSON middleware (Stripe necesita raw body)
+app.use('/api/webhooks', webhookRoutes);
+
+// JSON middleware para otras rutas
 app.use(express.json({ limit: '30mb' }));
 app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 
@@ -129,13 +136,19 @@ app.use('/uploads', (req, res, next) => {
   });
 });
 
-// Rutas
+// Rutas - Webhooks ya registrados arriba
+// Middleware JSON (DESPUÉS de webhooks)
+// app.use(express.json({ limit: '50mb' })); - Ya configurado arriba
+// app.use(express.urlencoded({ extended: true, limit: '50mb' })); - Ya configurado arriba
+
+// Otras rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rentals', rentalRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Hacer io disponible en las rutas
 app.io = io;
