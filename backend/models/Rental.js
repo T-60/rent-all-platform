@@ -55,10 +55,23 @@ const rentalSchema = new mongoose.Schema({
   paymentStatus: {
     type: String,
     enum: {
-      values: ['pending', 'paid', 'refunded'],
+      values: ['pending', 'paid', 'refunded', 'failed'],
       message: 'Estado de pago inválido'
     },
     default: 'pending'
+  },
+  // Campos de Stripe
+  paymentIntentId: {
+    type: String,
+    default: null
+  },
+  stripeSessionId: {
+    type: String,
+    default: null
+  },
+  transactionId: {
+    type: String,
+    default: null
   },
   notes: {
     type: String,

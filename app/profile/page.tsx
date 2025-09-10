@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/sidebar"
 import { EditProductForm } from "@/components/edit-product-form"
 import { useFloatingChat } from "@/components/floating-chat-manager"
 import { ScheduleDeliveryModal } from "@/components/schedule-delivery-modal"
+import { PaymentCheckout } from "@/components/payment-checkout"
 import { useAuth } from "@/contexts/auth-context"
 import { useProducts } from "@/contexts/products-context"
 import { useChat } from "@/contexts/chat-context"
@@ -38,6 +39,10 @@ export default function ProfilePage() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [scheduleModalType, setScheduleModalType] = useState<'delivery' | 'return'>('delivery')
   const [activeScheduleRental, setActiveScheduleRental] = useState<any>(null)
+
+  // Estados para el modal de pago
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [activePaymentRental, setActivePaymentRental] = useState<any>(null)
 
   // Fetch user's owned products
   useEffect(() => {
@@ -319,6 +324,12 @@ export default function ProfilePage() {
     setScheduleModalOpen(true)
   }
 
+  // Función para abrir el modal de pago
+  const handleOpenPayment = (rental: any) => {
+    setActivePaymentRental(rental)
+    setPaymentModalOpen(true)
+  }
+
   // Función para confirmar la programación desde el modal
   const handleConfirmSchedule = async (dateTime: string) => {
     if (!activeScheduleRental) return
@@ -575,6 +586,24 @@ export default function ProfilePage() {
                                      rental.status === 'completed' ? 'Completado' :
                                      rental.status === 'pending' ? 'Pendiente' : 'Cancelado'}
                                   </Badge>
+                                  
+                                  {/* Mostrar estado de pago si está confirmado */}
+                                  {rental.status === 'confirmed' && (
+                                    <Badge 
+                                      variant="outline"
+                                      className={
+                                        rental.paymentStatus === 'paid'
+                                          ? "text-green-600 border-green-600 bg-green-50"
+                                          : rental.paymentStatus === 'failed'
+                                          ? "text-red-600 border-red-600 bg-red-50"
+                                          : "text-yellow-600 border-yellow-600 bg-yellow-50"
+                                      }
+                                    >
+                                      {rental.paymentStatus === 'paid' ? '✓ Pagado' : 
+                                       rental.paymentStatus === 'failed' ? '✗ Pago fallido' : '⏳ Pago pendiente'}
+                                    </Badge>
+                                  )}
+                                  
                                   <div className="flex space-x-2">
                                     {(rental.status !== 'cancelled' && rental.status !== 'completed') && (
                                       <Button
@@ -584,6 +613,16 @@ export default function ProfilePage() {
                                       >
                                         <MessageCircle className="h-4 w-4 mr-1" />
                                         Chat
+                                      </Button>
+                                    )}
+                                    {/* Botón de pago para alquileres confirmados pero no pagados */}
+                                    {rental.status === 'confirmed' && rental.paymentStatus === 'pending' && (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleOpenPayment(rental)}
+                                        className="bg-green-600 hover:bg-green-700 text-white"
+                                      >
+                                        💳 Pagar
                                       </Button>
                                     )}
                                     <Button
@@ -1041,6 +1080,35 @@ export default function ProfilePage() {
             </div>
           </div>
         </main>
+        
+        {/* Modal de pago */}
+        {paymentModalOpen && activePaymentRental && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
+              <PaymentCheckout
+                rental={activePaymentRental}
+                onClose={() => {
+                  setPaymentModalOpen(false)
+                  setActivePaymentRental(null)
+                }}
+                onSuccess={() => {
+                  // Actualizar el estado del alquiler a "paid"
+                  setUserRentals(prev => prev.map(rental => 
+                    rental._id === activePaymentRental._id 
+                      ? { ...rental, paymentStatus: 'paid' }
+                      : rental
+                  ))
+                  setPaymentModalOpen(false)
+                  setActivePaymentRental(null)
+                  toast({
+                    title: "Pago exitoso",
+                    description: "El pago se ha procesado correctamente. El propietario puede proceder con la programación de entrega."
+                  })
+                }}
+              />
+            </div>
+          </div>
+        )}
         
         {/* Modal de programación de entrega/devolución */}
         <ScheduleDeliveryModal
