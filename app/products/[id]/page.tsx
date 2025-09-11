@@ -65,7 +65,7 @@ export default function ProductDetailPage() {
       setLoadingPendingRentals(true)
       const response = await fetch(`/api/rentals?product=${productId}&status=pending`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}`
         }
       })
       
@@ -236,7 +236,7 @@ export default function ProductDetailPage() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}`
         },
         body: JSON.stringify({
           status: 'confirmed',

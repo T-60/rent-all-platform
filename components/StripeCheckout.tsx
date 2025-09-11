@@ -40,10 +40,14 @@ export function StripeCheckout({ rental, onSuccess, onCancel }: StripeCheckoutPr
     setErrorMessage('');
 
     try {
+      const returnUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/payments/success?rental_id=${rental._id}`
+        : `/payments/success?rental_id=${rental._id}`
+        
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/payments/success?rental_id=${rental._id}`,
+          return_url: returnUrl,
         },
         redirect: 'if_required'
       });
@@ -58,7 +62,7 @@ export function StripeCheckout({ rental, onSuccess, onCancel }: StripeCheckoutPr
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
+              'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}`
             },
             body: JSON.stringify({
               paymentIntentId: paymentIntent.id

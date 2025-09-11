@@ -23,11 +23,11 @@ const getApiUrl = (): string => {
   
   // Si estamos en localhost, usar localhost
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:3001/api';
+    return 'http://localhost:3001/api';  // ✅ Revertido: puerto 3001
   }
   
   // Para cualquier otra IP (red universitaria, hotspot, etc.)
-  return `http://${hostname}:3001/api`;
+  return `http://${hostname}:3001/api`;  // ✅ Revertido: puerto 3001
 };
 
 const API_URL = getApiUrl();
@@ -143,7 +143,23 @@ export interface Notification {
   recipient: string;
   title: string;
   message: string;
-  type: 'welcome' | 'rental_created' | 'rental_request' | 'rental_confirmed' | 'rental_cancelled' | 'product_created' | 'product_rented' | 'system';
+  type: 
+    | 'welcome' 
+    | 'rental_created' 
+    | 'rental_request' 
+    | 'rental_confirmed' 
+    | 'rental_cancelled' 
+    | 'product_created' 
+    | 'product_rented' 
+    | 'system'
+    // Nuevos tipos para chat
+    | 'private_message'
+    | 'chat_request'
+    // Nuevos tipos para pagos
+    | 'payment_processed'
+    | 'payment_failed'
+    | 'payment_required'
+    | 'payment_reminder';
   read: boolean;
   relatedProduct?: {
     _id: string;
@@ -468,6 +484,16 @@ class ApiService {
     return this.handleResponse<{ rental: any; message: string }>(response);
   }
 
+  // Eliminar alquiler
+  async deleteRental(rentalId: string): Promise<{ message: string; deletedRentalId: string }> {
+    const response = await fetch(`${API_URL}/rentals/${rentalId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(true),
+    });
+
+    return this.handleResponse<{ message: string; deletedRentalId: string }>(response);
+  }
+
   // Obtener detalles de un alquiler específico
   async getRental(rentalId: string): Promise<{ rental: any }> {
     const response = await fetch(`${API_URL}/rentals/${rentalId}`, {
@@ -683,6 +709,91 @@ class ApiService {
     });
 
     const result = await this.handleResponse<{ paymentStatus: string; paymentIntentId?: string }>(response);
+    return result;
+  }
+
+  // ===== MÉTODOS PARA NOTIFICACIONES ESPECÍFICAS =====
+
+  // Crear notificación de mensaje privado
+  async createPrivateMessageNotification(data: {
+    recipientId: string;
+    senderName: string;
+    messagePreview: string;
+    chatId: string;
+    senderId: string;
+  }): Promise<Notification> {
+    const response = await fetch(`${API_URL}/notifications/chat/message`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify(data),
+    });
+
+    const result = await this.handleResponse<Notification>(response);
+    return result;
+  }
+
+  // Crear notificación de solicitud de chat
+  async createChatRequestNotification(data: {
+    recipientId: string;
+    requesterName: string;
+    productTitle: string;
+    productId: string;
+    requesterId: string;
+  }): Promise<Notification> {
+    const response = await fetch(`${API_URL}/notifications/chat/request`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify(data),
+    });
+
+    const result = await this.handleResponse<Notification>(response);
+    return result;
+  }
+
+  // Crear notificación de pago procesado
+  async createPaymentProcessedNotification(data: {
+    userId: string;
+    amount: number;
+    paymentMethod: string;
+    rentalId: string;
+    productTitle: string;
+  }): Promise<Notification> {
+    const response = await fetch(`${API_URL}/notifications/payment/processed`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify(data),
+    });
+
+    const result = await this.handleResponse<Notification>(response);
+    return result;
+  }
+
+  // Crear notificación de pago fallido
+  async createPaymentFailedNotification(data: {
+    userId: string;
+    amount: number;
+    reason: string;
+    rentalId: string;
+    productTitle: string;
+  }): Promise<Notification> {
+    const response = await fetch(`${API_URL}/notifications/payment/failed`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify(data),
+    });
+
+    const result = await this.handleResponse<Notification>(response);
+    return result;
+  }
+
+  // Marcar notificaciones de chat como leídas
+  async markChatNotificationsAsRead(chatId: string): Promise<{ modifiedCount: number }> {
+    const response = await fetch(`${API_URL}/notifications/chat/${chatId}/mark-read`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+    });
+
+    const result = await this.handleResponse<{ modifiedCount: number }>(response);
     return result;
   }
 }

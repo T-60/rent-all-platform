@@ -26,10 +26,14 @@ export function StripeCheckout({ rental, onSuccess, onError }: StripeCheckoutPro
     setLoading(true)
 
     try {
+      const returnUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/payments/success?rental_id=${rental._id}`
+        : `/payments/success?rental_id=${rental._id}`
+        
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/payments/success?rental_id=${rental._id}`,
+          return_url: returnUrl,
         },
         redirect: "if_required"
       })

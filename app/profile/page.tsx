@@ -9,6 +9,7 @@ import { ScheduleDeliveryModal } from "@/components/schedule-delivery-modal"
 import { PaymentCheckout } from "@/components/payment-checkout"
 import { useAuth } from "@/contexts/auth-context"
 import { useProducts } from "@/contexts/products-context"
+import { useProfile } from "@/contexts/profile-context"
 import { useChat } from "@/contexts/chat-context"
 import { apiService, type Product, type Rental } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +18,7 @@ import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
+import { NotificationBadge } from "@/components/ui/notification-badge"
 import { User, Mail, GraduationCap, Package, Calendar, Clock, MapPin, Eye, Edit, Trash2, Loader2, MessageCircle } from "lucide-react"
 import { SimpleSmartImage } from "@/components/simple-smart-image"
 
@@ -24,6 +26,7 @@ export default function ProfilePage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const { removeProductFromList, refreshProducts } = useProducts()
+  const { pendingRequestsCount, refreshProfileCounts } = useProfile()
   const { unreadCount } = useChat()
   const { openChat } = useFloatingChat()
   const [selectedRental, setSelectedRental] = useState<string | null>(null)
@@ -93,38 +96,77 @@ export default function ProfilePage() {
   const handleOpenChat = (rental: any) => {
     console.log('🔍 Debug rental data:', rental)
     console.log('🔍 Debug user data:', user)
+    console.log('🔍 Rental owner:', rental.owner)
+    console.log('🔍 Rental renter:', rental.renter)
+    console.log('🔍 Product owner:', rental.product?.owner)
+    console.log('🔍 Rental owner:', rental.owner)  // ✅ AGREGAR: Ver rental.owner también
     
-    // Determinar quién es el otro usuario con más validaciones
+    // Determinar quién es el otro usuario con lógica mejorada
     let otherUser = null
+    
+    // Obtener owner: primero rental.owner, luego rental.product.owner como fallback
+    let rentalOwner = rental.owner || rental.product?.owner
+    let rentalRenter = rental.renter
 
-    if (user?.id === rental.owner?._id || user?.id === rental.owner?.id) {
-      // Soy el propietario, el otro es el inquilino
-      otherUser = rental.renter
+    console.log('🔍 Processed rentalOwner:', rentalOwner)
+    console.log('🔍 Processed rentalRenter:', rentalRenter)
+    console.log('🔍 Current user ID:', user?.id)
+
+    // Verificar si soy el propietario del producto
+    if (user?.id === rentalOwner?._id || user?.id === rentalOwner?.id) {
+      // Soy el propietario, el otro usuario es el renter
+      otherUser = rentalRenter
       console.log('🔍 Soy propietario, otro usuario es renter:', otherUser)
-    } else {
-      // Soy el inquilino, el otro es el propietario
-      otherUser = rental.product?.owner || rental.owner
+    } else if (user?.id === rentalRenter?._id || user?.id === rentalRenter?.id) {
+      // Soy el inquilino, el otro usuario es el owner
+      otherUser = rentalOwner
       console.log('🔍 Soy inquilino, otro usuario es owner:', otherUser)
     }
 
-    if (!otherUser || (!otherUser._id && !otherUser.id)) {
+    // Validación mejorada del otherUser
+    if (!otherUser) {
       console.error('❌ No se pudo determinar el otro usuario:', { 
         rental, 
         user, 
         otherUser,
-        rentalOwner: rental.owner,
-        rentalRenter: rental.renter,
-        productOwner: rental.product?.owner
+        rentalOwner: rentalOwner,
+        rentalRenter: rentalRenter,
+        userIdMatch1: user?.id === rentalOwner?._id,
+        userIdMatch2: user?.id === rentalOwner?.id,
+        userIdMatch3: user?.id === rentalRenter?._id,
+        userIdMatch4: user?.id === rentalRenter?.id
+      })
+      
+      toast({
+        title: "Error",
+        description: "No se pudo determinar el otro usuario para el chat",
+        variant: "destructive"
       })
       return
     }
+
+    // Validar que otherUser tenga datos mínimos
+    const otherUserId = otherUser._id || otherUser.id
+    const otherUserName = otherUser.name || 'Usuario'
+    
+    if (!otherUserId) {
+      console.error('❌ El otro usuario no tiene ID válido:', otherUser)
+      toast({
+        title: "Error", 
+        description: "Datos del usuario incompletos para el chat",
+        variant: "destructive"
+      })
+      return
+    }
+
+    console.log('✅ Abriendo chat con:', { otherUserId, otherUserName })
 
     openChat({
       rentalId: rental._id,
       productTitle: rental.product?.title || 'Producto',
       otherUser: {
-        _id: otherUser._id || otherUser.id,
-        name: otherUser.name || 'Usuario',
+        _id: otherUserId,
+        name: otherUserName,
         avatar: otherUser.avatar
       }
     })
@@ -227,6 +269,43 @@ export default function ProfilePage() {
       toast({
         title: "Error",
         description: "No se pudo eliminar el producto",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDeleteRental = async (rentalId: string, rentalTitle: string, isOwnerRequest: boolean = false) => {
+    const confirmMessage = isOwnerRequest 
+      ? `¿Estás seguro de que quieres eliminar la solicitud de "${rentalTitle}"?`
+      : `¿Estás seguro de que quieres eliminar tu alquiler de "${rentalTitle}"?`
+    
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      await apiService.deleteRental(rentalId)
+      
+      if (isOwnerRequest) {
+        // Actualizar lista de solicitudes como propietario
+        setOwnerRentals(prev => prev.filter(r => r._id !== rentalId))
+      } else {
+        // Actualizar lista de alquileres como usuario
+        setUserRentals(prev => prev.filter(r => r._id !== rentalId))
+      }
+      
+      // Refrescar contadores del perfil
+      refreshProfileCounts()
+      
+      toast({
+        title: "Alquiler eliminado",
+        description: `El ${isOwnerRequest ? 'solicitud' : 'alquiler'} ha sido eliminado exitosamente`
+      })
+    } catch (error) {
+      console.error('Error deleting rental:', error)
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el alquiler",
         variant: "destructive"
       })
     }
@@ -501,13 +580,14 @@ export default function ProfilePage() {
                 <Tabs defaultValue="rentals" className="w-full">
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="rentals">Mis Alquileres</TabsTrigger>
-                    <TabsTrigger value="requests" className="relative">
+                    <TabsTrigger value="requests" className="relative flex items-center">
                       Solicitudes
-                      {ownerRentals.filter(r => r.status === 'pending').length > 0 && (
-                        <Badge className="ml-2 h-5 w-5 p-0 text-xs bg-red-500">
-                          {ownerRentals.filter(r => r.status === 'pending').length}
-                        </Badge>
-                      )}
+                      <NotificationBadge 
+                        count={pendingRequestsCount} 
+                        size="sm" 
+                        variant="destructive"
+                        className="ml-2"
+                      />
                     </TabsTrigger>
                     <TabsTrigger value="owned">Mis Productos</TabsTrigger>
                   </TabsList>
@@ -635,6 +715,18 @@ export default function ProfilePage() {
                                       <Eye className="h-4 w-4 mr-1" />
                                       {selectedRental === rental._id ? "Ocultar" : "Ver"} Detalles
                                     </Button>
+                                    {/* Botón de eliminar para alquileres en estados permitidos */}
+                                    {['pending', 'cancelled', 'completed'].includes(rental.status) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteRental(rental._id, rental.product.title, false)}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Eliminar
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -649,12 +741,17 @@ export default function ProfilePage() {
                   <TabsContent value="requests">
                     <Card>
                       <CardHeader>
-                        <CardTitle className="flex items-center">
-                          Solicitudes de Alquiler
+                        <CardTitle className="flex items-center justify-between">
+                          <span>Solicitudes de Alquiler</span>
                           {ownerRentals.filter(r => r.status === 'pending').length > 0 && (
-                            <Badge className="ml-2 bg-orange-100 text-orange-800">
-                              {ownerRentals.filter(r => r.status === 'pending').length} pendientes
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <NotificationBadge 
+                                count={ownerRentals.filter(r => r.status === 'pending').length} 
+                                size="md" 
+                                variant="warning"
+                              />
+                              <span className="text-sm text-orange-600 font-medium">pendientes</span>
+                            </div>
                           )}
                         </CardTitle>
                       </CardHeader>
@@ -762,6 +859,15 @@ export default function ProfilePage() {
                                       >
                                         <MessageCircle className="h-4 w-4 mr-1" />
                                         Chat
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteRental(rental._id, rental.product.title, true)}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Eliminar
                                       </Button>
                                     </div>
                                   )}
@@ -872,12 +978,32 @@ export default function ProfilePage() {
                                         ✅ Alquiler completado<br/>
                                         ¡Gracias por usar RentAll!
                                       </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteRental(rental._id, rental.product.title, true)}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Eliminar
+                                      </Button>
                                     </div>
                                   )}
                                   
                                   {rental.status === 'cancelled' && (
-                                    <div className="text-xs text-red-600 text-center bg-red-50 p-2 rounded">
-                                      ❌ Alquiler cancelado
+                                    <div className="flex flex-col space-y-1">
+                                      <div className="text-xs text-red-600 text-center bg-red-50 p-2 rounded">
+                                        ❌ Alquiler cancelado
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteRental(rental._id, rental.product.title, true)}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Eliminar
+                                      </Button>
                                     </div>
                                   )}
                                 </div>

@@ -211,7 +211,8 @@ router.get('/my-rentals', authMiddleware, async (req, res) => {
           select: 'name email phone avatar'
         }
       })
-      .populate('owner', 'name email phone avatar')
+      .populate('renter', 'name email phone avatar')  // ✅ Este rental es el usuario actual (renter)
+      .populate('owner', 'name email phone avatar')   // ✅ AGREGAR: Owner poblado también
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -250,8 +251,16 @@ router.get('/my-listings', authMiddleware, async (req, res) => {
 
     const skip = (page - 1) * limit;
     const rentals = await Rental.find(filters)
-      .populate('product', 'title images pricePerDay location category')
+      .populate({
+        path: 'product',
+        select: 'title images pricePerDay location category',
+        populate: {
+          path: 'owner',
+          select: 'name email phone avatar'
+        }
+      })
       .populate('renter', 'name email phone avatar')
+      .populate('owner', 'name email phone avatar')  // ✅ Owner del rental (usuario actual)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -692,6 +701,48 @@ router.put('/:id/confirm-return', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error confirmando devolución:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
+// Ruta para eliminar alquiler (solo usuarios que lo crearon o propietarios)
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    const rental = await Rental.findById(req.params.id)
+      .populate('product', 'title')
+      .populate('renter', 'name email')
+      .populate('owner', 'name email');
+
+    if (!rental) {
+      return res.status(404).json({ message: 'Alquiler no encontrado' });
+    }
+
+    // Solo el arrendatario o el propietario pueden eliminar
+    const isRenter = rental.renter._id.toString() === req.user._id.toString();
+    const isOwner = rental.owner._id.toString() === req.user._id.toString();
+    
+    if (!isRenter && !isOwner) {
+      return res.status(403).json({ 
+        message: 'No tienes permisos para eliminar este alquiler' 
+      });
+    }
+
+    // Solo se pueden eliminar alquileres en ciertos estados
+    const deletableStatuses = ['pending', 'cancelled', 'completed'];
+    if (!deletableStatuses.includes(rental.status)) {
+      return res.status(400).json({ 
+        message: 'No se puede eliminar un alquiler en curso. Cancélalo primero.' 
+      });
+    }
+
+    await Rental.findByIdAndDelete(req.params.id);
+
+    res.json({
+      message: 'Alquiler eliminado exitosamente',
+      deletedRentalId: req.params.id
+    });
+  } catch (error) {
+    console.error('Error eliminando alquiler:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 });

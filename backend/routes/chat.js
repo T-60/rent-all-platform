@@ -3,6 +3,7 @@ const router = express.Router();
 const Message = require('../models/Message');
 const Rental = require('../models/Rental');
 const { authMiddleware } = require('../middleware/auth');
+const NotificationService = require('../services/NotificationService');  // ✅ AGREGAR: Importar NotificationService
 
 // Obtener mensajes de un alquiler específico
 router.get('/rental/:rentalId', authMiddleware, async (req, res) => {
@@ -124,6 +125,22 @@ router.post('/send', authMiddleware, async (req, res) => {
       { path: 'sender', select: 'name avatar' },
       { path: 'receiver', select: 'name avatar' }
     ]);
+
+    // ✅ AGREGAR: Crear notificación de mensaje
+    try {
+      const messagePreview = message.length > 50 ? message.substring(0, 50) + '...' : message;
+      await NotificationService.createPrivateMessageNotification(
+        receiverId,                           // ID del receptor
+        newMessage.sender.name,              // Nombre del remitente
+        messagePreview,                      // Vista previa del mensaje
+        rentalId,                           // ID del chat (usando rentalId como chatId)
+        senderId                            // ID del remitente
+      );
+      console.log(`📱 Notificación de mensaje enviada a usuario ${receiverId}`);
+    } catch (notifError) {
+      console.error('❌ Error creando notificación de mensaje:', notifError);
+      // No fallar el envío del mensaje si la notificación falla
+    }
 
     // Emitir mensaje via Socket.io si está disponible
     if (req.app.io) {

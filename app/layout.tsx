@@ -5,6 +5,7 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import { ProductsProvider } from "@/contexts/products-context"
 import { NotificationProvider } from "@/contexts/notification-context"
+import { ProfileProvider } from "@/contexts/profile-context"
 import { WishlistProvider } from "@/contexts/WishlistContext"
 import { ChatProvider } from "@/contexts/chat-context"
 import { FloatingChatManager } from "@/components/floating-chat-manager"
@@ -32,18 +33,18 @@ export default function RootLayout({
             <WishlistProvider>
               <ProductsProvider>
                 <NotificationProvider>
-                  <ChatProvider>
-                    {children}
-                    <NoSSR>
+                  <ProfileProvider>
+                    <ChatProvider>
+                      {children}
                       <FloatingChatManager />
-                    </NoSSR>
-                    <Toaster 
-                      position="top-center"
-                      expand={false}
-                      richColors
-                      closeButton
-                    />
-                  </ChatProvider>
+                      <Toaster 
+                        position="top-center"
+                        expand={false}
+                        richColors
+                        closeButton
+                      />
+                    </ChatProvider>
+                  </ProfileProvider>
                 </NotificationProvider>
               </ProductsProvider>
             </WishlistProvider>

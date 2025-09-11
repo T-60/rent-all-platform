@@ -57,14 +57,16 @@ export function FloatingChatWindow({
   // Cargar mensajes cuando se abre el chat
   useEffect(() => {
     if (isOpen && rentalId && !isMinimized) {
+      console.log(`🔄 Cargando chat para alquiler: ${rentalId}`)
       setIsLoading(true)
       getMessages(rentalId)
         .then(() => {
+          console.log(`✅ Mensajes cargados, uniéndose a sala: ${rentalId}`)
           joinRental(rentalId)
           markAsRead(rentalId)
         })
         .catch(error => {
-          console.error('Error cargando chat:', error)
+          console.error('❌ Error cargando chat:', error)
         })
         .finally(() => {
           setIsLoading(false)
@@ -73,6 +75,7 @@ export function FloatingChatWindow({
 
     return () => {
       if (rentalId) {
+        console.log(`🚪 Limpieza: Saliendo de sala ${rentalId}`)
         leaveRental(rentalId)
       }
     }
