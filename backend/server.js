@@ -14,7 +14,7 @@ const rentalRoutes = require('./routes/rentals');
 const notificationRoutes = require('./routes/notifications');
 const chatRoutes = require('./routes/chat');
 const paymentRoutes = require('./routes/payments');
-const webhookRoutes = require('./routes/webhooks');
+// const webhookRoutes = require('./routes/webhooks'); // DESHABILITADO: duplica webhooks de payments
 
 const app = express();
 const server = http.createServer(app);
@@ -82,7 +82,7 @@ app.use(cors({
 }));
 
 // Rutas - Webhooks ANTES de JSON middleware (Stripe necesita raw body)
-app.use('/api/webhooks', webhookRoutes);
+// app.use('/api/webhooks', webhookRoutes); // DESHABILITADO: duplica webhooks de payments
 
 // JSON middleware para otras rutas
 app.use(express.json({ limit: '30mb' }));

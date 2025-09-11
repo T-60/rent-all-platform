@@ -117,10 +117,16 @@ export interface Rental {
     name: string;
     email: string;
   };
+  owner: {
+    _id: string;
+    name: string;
+    email: string;
+  };
   startDate: string;
   endDate: string;
-  days: number;
-  totalAmount: number;
+  totalDays: number;
+  pricePerDay: number;
+  totalPrice: number;
   status: 'pending' | 'confirmed' | 'delivery_arranged' | 'active' | 'return_arranged' | 'completed' | 'cancelled';
   paymentStatus: 'pending' | 'paid' | 'failed';
   paymentIntentId?: string;

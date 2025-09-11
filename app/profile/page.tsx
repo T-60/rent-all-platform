@@ -97,7 +97,7 @@ export default function ProfilePage() {
     // Determinar quién es el otro usuario con más validaciones
     let otherUser = null
 
-    if (user?._id === rental.owner?._id || user?.id === rental.owner?._id) {
+    if (user?.id === rental.owner?._id || user?.id === rental.owner?.id) {
       // Soy el propietario, el otro es el inquilino
       otherUser = rental.renter
       console.log('🔍 Soy propietario, otro usuario es renter:', otherUser)
@@ -556,7 +556,7 @@ export default function ProfilePage() {
                                     <Badge variant="secondary">{rental.product.category}</Badge>
                                     <span className="text-sm text-gray-500">S/ {rental.product.pricePerDay}/día</span>
                                     <span className="text-sm text-blue-600">
-                                      {rental.days} {rental.days === 1 ? "día" : "días"} - Total: S/ {rental.totalAmount}
+                                      {rental.totalDays} {rental.totalDays === 1 ? "día" : "días"} - Total: S/ {rental.totalPrice}
                                     </span>
                                   </div>
                                 </div>
@@ -980,7 +980,7 @@ export default function ProfilePage() {
                         <div>
                           <h4 className="font-semibold text-sm text-gray-700 mb-1">Duración:</h4>
                           <p className="text-sm">
-                            {selectedRentalDetails.days} {selectedRentalDetails.days === 1 ? "día" : "días"}
+                            {selectedRentalDetails.totalDays} {selectedRentalDetails.totalDays === 1 ? "día" : "días"}
                           </p>
                         </div>
                         <div>
@@ -1000,7 +1000,7 @@ export default function ProfilePage() {
                         </div>
                         <div>
                           <h4 className="font-semibold text-sm text-gray-700 mb-1">Total Pagado:</h4>
-                          <p className="text-lg font-bold text-green-600">S/ {selectedRentalDetails.totalAmount}</p>
+                          <p className="text-lg font-bold text-green-600">S/ {selectedRentalDetails.totalPrice}</p>
                         </div>
                         <div>
                           <h4 className="font-semibold text-sm text-gray-700 mb-1">Estado:</h4>

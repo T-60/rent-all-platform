@@ -83,20 +83,20 @@ export function PaymentCheckout({ rental, onClose, onSuccess }: PaymentCheckoutP
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Precio por día:</span>
-                <span className="font-semibold">S/ {rental.product.pricePerDay}</span>
+                <span className="font-semibold">S/ {rental.pricePerDay}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Duración:</span>
-                <span className="font-semibold">{rental.days} {rental.days === 1 ? "día" : "días"}</span>
+                <span className="font-semibold">{rental.totalDays} {rental.totalDays === 1 ? "día" : "días"}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Subtotal:</span>
-                <span className="font-semibold">S/ {(rental.product.pricePerDay * rental.days).toFixed(2)}</span>
+                <span className="font-semibold">S/ {(rental.pricePerDay * rental.totalDays).toFixed(2)}</span>
               </div>
               <Separator />
               <div className="flex items-center justify-between text-lg">
                 <span className="font-bold">Total:</span>
-                <span className="font-bold text-green-600">S/ {rental.totalAmount}</span>
+                <span className="font-bold text-green-600">S/ {rental.totalPrice}</span>
               </div>
             </div>
 
