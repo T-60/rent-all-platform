@@ -46,7 +46,7 @@ export function PaymentCheckout({ rental, onSuccess, onCancel }: PaymentCheckout
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('token') : ''}`
         },
         body: JSON.stringify({
           rentalId: rental._id,

@@ -45,12 +45,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
   const isAuthenticated = !!user
 
   // Función para verificar si hay un usuario autenticado al cargar la app
   const checkAuth = async () => {
     try {
+      // Only access localStorage in browser environment
+      if (typeof window === 'undefined') {
+        setIsLoading(false)
+        return
+      }
+      
       const storedToken = localStorage.getItem('token')
       if (!storedToken) {
         setIsLoading(false)
@@ -63,7 +70,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('Error checking authentication:', error)
       // Si hay error, limpiar el token
-      localStorage.removeItem('token')
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token')
+      }
       setToken(null)
     } finally {
       setIsLoading(false)
@@ -81,7 +90,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (response && response.token && response.user) {
         console.log('✅ Datos válidos recibidos');
-        localStorage.setItem('token', response.token);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('token', response.token);
+        }
         setUser(response.user);
         setToken(response.token);
         console.log('✅ Usuario configurado en contexto:', response.user);
@@ -127,7 +138,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (response && response.token && response.user) {
         console.log('✅ Datos válidos recibidos');
-        localStorage.setItem('token', response.token);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('token', response.token);
+        }
         setUser(response.user);
         setToken(response.token);
         console.log('✅ Usuario configurado en contexto:', response.user);
@@ -164,13 +177,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Función de logout
   const handleLogout = () => {
-    localStorage.removeItem('token')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token')
+    }
     setUser(null)
     setToken(null)
   }
 
   // Verificar autenticación al cargar la aplicación
   useEffect(() => {
+    setMounted(true)
     checkAuth()
   }, [])
 

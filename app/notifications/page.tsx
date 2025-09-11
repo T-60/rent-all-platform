@@ -3,9 +3,11 @@
 import { ProtectedRoute } from "@/components/protected-route"
 import { Sidebar } from "@/components/sidebar"
 import { useNotifications } from "@/contexts/notification-context"
+import { useProfile } from "@/contexts/profile-context"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { NotificationBadge } from "@/components/ui/notification-badge"
 import { Bell, Check, Clock, Trash2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
@@ -19,6 +21,8 @@ export default function NotificationsPage() {
     deleteNotification, 
     refreshNotifications 
   } = useNotifications()
+  
+  const { clearAllProfileNotifications } = useProfile()
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -32,6 +36,8 @@ export default function NotificationsPage() {
   const handleMarkAllAsRead = async () => {
     try {
       await markAllAsRead()
+      // También limpiar las notificaciones del perfil
+      clearAllProfileNotifications()
       toast.success("Todas las notificaciones marcadas como leídas")
     } catch (error) {
       toast.error("No se pudieron marcar todas las notificaciones como leídas")
@@ -90,6 +96,20 @@ export default function NotificationsPage() {
         return '🎉'
       case 'system':
         return '📢'
+      // Nuevos iconos para chat
+      case 'private_message':
+        return '💬'
+      case 'chat_request':
+        return '🗨️'
+      // Nuevos iconos para pagos
+      case 'payment_processed':
+        return '💳'
+      case 'payment_failed':
+        return '❌'
+      case 'payment_required':
+        return '💰'
+      case 'payment_reminder':
+        return '⏰'
       default:
         return '🔔'
     }
@@ -108,15 +128,6 @@ export default function NotificationsPage() {
                 <p className="text-gray-600">Mantente al día con las últimas actualizaciones</p>
               </div>
               <div className="flex gap-2">
-                <Button 
-                  onClick={handleRefresh} 
-                  variant="outline" 
-                  size="sm"
-                  disabled={isLoading}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                  Actualizar
-                </Button>
                 {unreadCount > 0 && (
                   <Button onClick={handleMarkAllAsRead} variant="outline">
                     <Check className="h-4 w-4 mr-2" />
@@ -145,7 +156,7 @@ export default function NotificationsPage() {
               <Card>
                 <CardContent className="p-6 text-center">
                   <Check className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold">{notifications.length - unreadCount}</div>
+                  <div className="text-2xl font-bold">{Math.max(0, notifications.filter(n => n.read).length)}</div>
                   <div className="text-sm text-gray-600">Leídas</div>
                 </CardContent>
               </Card>

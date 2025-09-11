@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { apiService, type Notification, type NotificationsResponse } from '@/lib/api'
 import { useAuth } from './auth-context'
+import { io, Socket } from 'socket.io-client'
 
 interface NotificationContextType {
   notifications: Notification[]
@@ -18,10 +19,11 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, token } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [socket, setSocket] = useState<Socket | null>(null)
 
   // Función para cargar notificaciones desde el backend
   const refreshNotifications = async () => {
@@ -122,6 +124,54 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }
 
+  // Configurar conexión de Socket.io
+  useEffect(() => {
+    if (!isAuthenticated || !user || !token) {
+      // Desconectar socket si no hay usuario autenticado
+      if (socket) {
+        socket.disconnect()
+        setSocket(null)
+      }
+      return
+    }
+
+    // Crear conexión de socket
+    const newSocket = io('http://localhost:3001', {
+      auth: {
+        token: token
+      }
+    })
+
+    setSocket(newSocket)
+
+    // Escuchar nuevas notificaciones en tiempo real
+    newSocket.on('new_notification', (data: { notification: Notification; unreadCount: number }) => {
+      console.log('🔔 Nueva notificación recibida en tiempo real:', data)
+      
+      // Agregar la nueva notificación al inicio de la lista
+      setNotifications(prev => [data.notification, ...prev])
+      
+      // Actualizar contador con el valor exacto del servidor
+      setUnreadCount(data.unreadCount)
+    })
+
+    // Manejar errores de conexión
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ Error de conexión Socket.io:', error)
+    })
+
+    newSocket.on('connect', () => {
+      console.log('✅ Conectado a Socket.io para notificaciones en tiempo real')
+      // Unirse automáticamente a la sala personal del usuario
+      newSocket.emit('join_user', user.id)
+    })
+
+    // Cleanup function
+    return () => {
+      newSocket.disconnect()
+    }
+  }, [isAuthenticated, user, token])
+
   // Cargar notificaciones cuando el usuario se autentica
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -133,7 +183,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, [isAuthenticated, user])
 
-  // Actualizar conteo de no leídas cada cierto tiempo
+  // Actualizar conteo de no leídas cada cierto tiempo (menos frecuente con Socket.io)
   useEffect(() => {
     if (!isAuthenticated || !user) return
 
@@ -144,7 +194,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       } catch (error) {
         console.error('❌ Error actualizando conteo de notificaciones:', error)
       }
-    }, 30000) // Cada 30 segundos
+    }, 120000) // Cada 2 minutos (reducido de 30 segundos)
 
     return () => clearInterval(interval)
   }, [isAuthenticated, user])

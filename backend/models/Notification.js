@@ -19,7 +19,24 @@ const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: {
-      values: ['welcome', 'rental_created', 'rental_request', 'rental_confirmed', 'rental_cancelled', 'product_created', 'product_rented', 'system'],
+      values: [
+        'welcome', 
+        'rental_created', 
+        'rental_request', 
+        'rental_confirmed', 
+        'rental_cancelled', 
+        'product_created', 
+        'product_rented', 
+        'system',
+        // Nuevos tipos para chat
+        'private_message',
+        'chat_request',
+        // Nuevos tipos para pagos
+        'payment_processed',
+        'payment_failed',
+        'payment_required',
+        'payment_reminder'
+      ],
       message: 'Tipo de notificación inválido'
     },
     required: true

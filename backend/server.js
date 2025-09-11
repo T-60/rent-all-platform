@@ -12,6 +12,7 @@ const productRoutes = require('./routes/products');
 const userRoutes = require('./routes/users');
 const rentalRoutes = require('./routes/rentals');
 const notificationRoutes = require('./routes/notifications');
+const notificationTypesRoutes = require('./routes/notification-types');
 const chatRoutes = require('./routes/chat');
 const paymentRoutes = require('./routes/payments');
 // const webhookRoutes = require('./routes/webhooks'); // DESHABILITADO: duplica webhooks de payments
@@ -26,11 +27,12 @@ const io = new Server(server, {
       
       const allowedOrigins = [
         "http://localhost:3000",
-        "http://localhost:3001", 
+        "http://localhost:3001",  // ✅ Revertido puerto correcto del backend
         process.env.CORS_ORIGIN,
         process.env.NEXT_PUBLIC_API_URL?.replace('/api', ''),
         "http://34.23.76.150:8080",
-        "http://34.23.76.150:3000"
+        "http://34.23.76.150:3000",
+        "http://34.23.76.150:3001"  // ✅ Revertido para producción
       ].filter(Boolean);
       
       if (allowedOrigins.includes(origin)) {
@@ -45,7 +47,7 @@ const io = new Server(server, {
   }
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3001;  // ✅ Revertido: puerto 3001
 
 // Middlewares
 app.use(helmet({
@@ -147,6 +149,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rentals', rentalRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/notification-types', notificationTypesRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/payments', paymentRoutes);
 
@@ -163,26 +166,102 @@ app.get('/api/health', (req, res) => {
 });
 
 // Socket.io configuration
+const connectedUsers = new Map(); // Mapear userId a socketId
+
+// Middleware de autenticación para Socket.io
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    
+    if (!token) {
+      console.log('❌ Socket sin token de autenticación');
+      return next(new Error('Authentication error: No token provided'));
+    }
+
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    socket.userId = decoded.id;
+    socket.userName = decoded.name;
+    
+    console.log(`✅ Socket autenticado para usuario: ${decoded.name} (ID: ${decoded.id})`);
+    next();
+  } catch (err) {
+    console.log('❌ Error autenticando socket:', err.message);
+    next(new Error('Authentication error: Invalid token'));
+  }
+});
+
 io.on('connection', (socket) => {
-  console.log('🔌 Usuario conectado:', socket.id);
+  const userId = socket.userId;
+  const userName = socket.userName;
+  
+  console.log(`🔌 Usuario conectado: ${userName} (${userId}) - Socket: ${socket.id}`);
+  
+  // Unir automáticamente a su sala personal
+  if (userId) {
+    socket.join(`user_${userId}`);
+    connectedUsers.set(userId, socket.id);
+    console.log(`👤 Usuario ${userName} (${userId}) unido automáticamente a su sala personal`);
+    
+    // Emitir confirmación de conexión
+    socket.emit('user_connected', { 
+      userId, 
+      userName,
+      message: 'Conectado exitosamente al chat' 
+    });
+  }
+
+  // Unir usuario a su sala personal para notificaciones (método manual - mantenido por compatibilidad)
+  socket.on('join_user', (requestedUserId) => {
+    // Solo permitir unirse a su propia sala
+    if (requestedUserId === userId) {
+      socket.join(`user_${requestedUserId}`);
+      connectedUsers.set(requestedUserId, socket.id);
+      console.log(`👤 Usuario ${userName} (${userId}) unido manualmente a su sala personal`);
+      socket.emit('joined_user_room', { userId: requestedUserId });
+    } else {
+      console.log(`❌ Usuario ${userId} intentó unirse a sala de usuario ${requestedUserId}`);
+      socket.emit('error', { message: 'No puedes unirte a la sala de otro usuario' });
+    }
+  });
 
   // Unirse a una sala de alquiler específica
   socket.on('join_rental', (rentalId) => {
-    socket.join(`rental_${rentalId}`);
-    console.log(`👤 Usuario ${socket.id} se unió a rental_${rentalId}`);
+    if (rentalId) {
+      socket.join(`rental_${rentalId}`);
+      console.log(`👤 Usuario ${userName} (${userId}) se unió a rental_${rentalId}`);
+      socket.emit('joined_rental_room', { rentalId });
+    }
   });
 
   // Salir de una sala de alquiler
   socket.on('leave_rental', (rentalId) => {
-    socket.leave(`rental_${rentalId}`);
-    console.log(`👋 Usuario ${socket.id} salió de rental_${rentalId}`);
+    if (rentalId) {
+      socket.leave(`rental_${rentalId}`);
+      console.log(`👋 Usuario ${userName} (${userId}) salió de rental_${rentalId}`);
+      socket.emit('left_rental_room', { rentalId });
+    }
   });
 
   // Manejo de desconexión
-  socket.on('disconnect', () => {
-    console.log('🔌 Usuario desconectado:', socket.id);
+  socket.on('disconnect', (reason) => {
+    // Remover usuario de la lista de conectados
+    if (userId) {
+      connectedUsers.delete(userId);
+      console.log(`👤 Usuario ${userName} (${userId}) desconectado. Razón: ${reason}`);
+    }
+    console.log(`🔌 Socket ${socket.id} desconectado`);
+  });
+
+  // Manejo de errores del socket
+  socket.on('error', (error) => {
+    console.log(`❌ Error en socket ${socket.id}:`, error);
   });
 });
+
+// Hacer io accesible globalmente para los servicios
+global.io = io;
 
 // Manejo de errores
 app.use((err, req, res, next) => {

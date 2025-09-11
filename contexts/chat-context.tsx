@@ -51,12 +51,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return 'http://localhost:3001'
+        return 'http://localhost:3001'  // ✅ Revertido: backend está en puerto 3001
       } else {
-        return `http://${hostname}:8080`
+        return `http://${hostname}:3001`  // ✅ Revertido para producción
       }
     }
-    return 'http://localhost:3001'
+    return 'http://localhost:3001'  // ✅ Revertido por defecto
   }
 
   const API_URL = getApiUrl()
@@ -64,20 +64,62 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // Inicializar Socket.io cuando el usuario está autenticado
   useEffect(() => {
     if (user && token) {
-      const socketUrl = API_URL.replace(':8080', ':3001') // Asegurar que use el puerto del backend
-      const newSocket = io(socketUrl, {
+      console.log(`🔌 Iniciando conexión de socket para usuario: ${user.name} (${user.id})`);
+      console.log(`🔌 URL del socket: ${API_URL}`);
+      console.log(`🔑 Token presente: ${!!token}`);
+      console.log(`🔑 Token (primeros 20 caracteres): ${token.substring(0, 20)}...`);
+      
+      // Verificar que también esté en localStorage
+      const storedToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      console.log(`🔑 Token en localStorage: ${!!storedToken}`);
+      
+      // Usar el token del contexto o del localStorage como fallback
+      const tokenToUse = token || storedToken;
+      
+      if (!tokenToUse) {
+        console.error('❌ No hay token disponible para el socket');
+        return;
+      }
+      
+      const newSocket = io(API_URL, {
         auth: {
-          token
-        }
+          token: tokenToUse
+        },
+        transports: ['polling', 'websocket'],
+        forceNew: true
       })
 
       newSocket.on('connect', () => {
-        console.log('💬 Conectado al chat:', newSocket.id)
+        console.log(`💬 Conectado al chat: ${newSocket.id} para usuario ${user.name}`)
         setIsConnected(true)
+        
+        // Confirmar que el usuario está en su sala
+        newSocket.emit('join_user', user.id);
       })
 
-      newSocket.on('disconnect', () => {
-        console.log('💬 Desconectado del chat')
+      newSocket.on('user_connected', (data) => {
+        console.log('✅ Confirmación de conexión:', data);
+      })
+
+      newSocket.on('joined_user_room', (data) => {
+        console.log('✅ Unido a sala de usuario:', data);
+      })
+
+      newSocket.on('joined_rental_room', (data) => {
+        console.log('✅ Unido a sala de alquiler:', data);
+      })
+
+      newSocket.on('connect_error', (error: any) => {
+        console.error('❌ Error de conexión del chat socket:', error);
+        setIsConnected(false)
+      })
+
+      newSocket.on('error', (error: any) => {
+        console.error('❌ Error del chat socket:', error?.message || error || 'Error desconocido');
+      })
+
+      newSocket.on('disconnect', (reason: string) => {
+        console.log('💬 Desconectado del chat. Razón:', reason)
         setIsConnected(false)
       })
 
@@ -101,7 +143,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         })
         
         // Actualizar contador de no leídos si el mensaje no es del usuario actual
-        if (data.message.sender._id !== user.id) {
+        if (user && data.message.sender._id !== user.id) {
           setUnreadCount(prev => prev + 1)
         }
       })
@@ -109,7 +151,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setSocket(newSocket)
 
       return () => {
+        console.log(`🔌 Cerrando conexión de socket para usuario: ${user?.name}`)
         newSocket.close()
+      }
+    } else {
+      // Si no hay usuario, limpiar socket
+      if (socket) {
+        socket.close()
+        setSocket(null)
+        setIsConnected(false)
       }
     }
   }, [user, token, API_URL])
@@ -230,12 +280,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const joinRental = (rentalId: string): void => {
     if (socket && isConnected) {
+      console.log(`🏠 Uniéndose a sala de alquiler: ${rentalId}`)
       socket.emit('join_rental', rentalId)
+    } else {
+      console.warn(`⚠️ Intento de unirse a sala ${rentalId} sin conexión de socket`)
     }
   }
 
   const leaveRental = (rentalId: string): void => {
     if (socket && isConnected) {
+      console.log(`🚪 Saliendo de sala de alquiler: ${rentalId}`)
       socket.emit('leave_rental', rentalId)
     }
   }
