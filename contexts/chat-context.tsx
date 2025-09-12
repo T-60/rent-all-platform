@@ -51,12 +51,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return 'http://localhost:3001'  // ✅ Revertido: backend está en puerto 3001
+        return 'http://localhost:3001'  // Desarrollo: backend directo
       } else {
-        return `http://${hostname}:3001`  // ✅ Revertido para producción
+        // Producción: usar el mismo host y puerto que el frontend (a través del proxy nginx)
+        return `http://${hostname}:8080`  // Socket.io a través de nginx proxy
       }
     }
-    return 'http://localhost:3001'  // ✅ Revertido por defecto
+    return 'http://localhost:3001'  // Por defecto desarrollo
   }
 
   const API_URL = getApiUrl()

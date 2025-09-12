@@ -135,8 +135,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       return
     }
 
+    // Configurar URL del socket según el entorno
+    const getSocketUrl = () => {
+      if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          return 'http://localhost:3001'  // Desarrollo: backend directo
+        } else {
+          // Producción: usar el mismo host y puerto que el frontend (a través del proxy nginx)
+          return `http://${hostname}:8080`  // Socket.io a través de nginx proxy
+        }
+      }
+      return 'http://localhost:3001'  // Por defecto desarrollo
+    }
+
     // Crear conexión de socket
-    const newSocket = io('http://localhost:3001', {
+    const newSocket = io(getSocketUrl(), {
       auth: {
         token: token
       }
