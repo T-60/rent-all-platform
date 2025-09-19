@@ -41,7 +41,12 @@ export default function DashboardPage() {
         <div className="flex h-screen bg-gray-50">
           <Sidebar />
           <main className="flex-1 overflow-auto">
-            <div className="p-8">
+            {/* Mobile header con botón de menú */}
+            <div className="md:hidden flex items-center justify-between p-4 bg-white border-b">
+              <h1 className="text-lg font-semibold">Agregar Producto</h1>
+              <Sidebar />
+            </div>
+            <div className="p-4 md:p-8">
               <AddProductForm onClose={() => setShowAddProduct(false)} />
             </div>
           </main>
@@ -55,19 +60,24 @@ export default function DashboardPage() {
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
         <main className="flex-1 overflow-auto">
-          <div className="p-8">
+          {/* Mobile header con botón de menú */}
+          <div className="md:hidden flex items-center justify-between p-4 bg-white border-b">
+            <h1 className="text-lg font-semibold">Dashboard</h1>
+            <Sidebar />
+          </div>
+          <div className="p-4 md:p-8">
             {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">¡Hola, {user?.name}! 👋</h1>
-              <p className="text-gray-600 mt-2">
+            <div className="mb-6 md:mb-8">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">¡Hola, {user?.name}! 👋</h1>
+              <p className="text-gray-600 mt-2 text-sm md:text-base">
                 Bienvenido a tu dashboard. Aquí puedes explorar productos disponibles para alquilar en tu universidad.
               </p>
             </div>
 
             {/* Add Product Section */}
-            <Card className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <Card className="mb-6 md:mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
               <CardHeader>
-                <CardTitle className="flex items-center text-blue-900">
+                <CardTitle className="flex items-center text-blue-900 text-lg md:text-xl">
                   <Plus className="h-5 w-5 mr-2" />
                   ¿Tienes algo para alquilar?
                 </CardTitle>

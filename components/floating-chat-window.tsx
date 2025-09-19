@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useChat } from '@/contexts/chat-context'
 import { useAuth } from '@/contexts/auth-context'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,6 +37,7 @@ export function FloatingChatWindow({
   position = 0
 }: FloatingChatWindowProps) {
   const { user } = useAuth()
+  const isMobile = useIsMobile()
   const { 
     messages, 
     sendMessage, 
@@ -131,24 +133,43 @@ export function FloatingChatWindow({
 
   if (!isOpen) return null
 
-  // Calcular posición desde la derecha
-  const rightPosition = 20 + (position * 370) // 350px width + 20px gap
+  // Posicionamiento responsive
+  const getPositioning = () => {
+    if (isMobile) {
+      return {
+        className: "fixed inset-x-4 bottom-4 z-50 transition-all duration-300 ease-in-out",
+        style: {}
+      }
+    } else {
+      // Desktop: posición desde la derecha
+      const rightPosition = 20 + (position * 370) // 350px width + 20px gap
+      return {
+        className: "fixed bottom-0 z-50 transition-all duration-300 ease-in-out",
+        style: { 
+          right: `${rightPosition}px`,
+          width: '350px'
+        }
+      }
+    }
+  }
+
+  const positioning = getPositioning()
 
   return (
     <div 
-      className={cn(
-        "fixed bottom-0 z-50 transition-all duration-300 ease-in-out",
-        isMinimized ? "translate-y-0" : "translate-y-0"
-      )}
-      style={{ 
-        right: `${rightPosition}px`,
-        width: '350px'
-      }}
+      className={positioning.className}
+      style={positioning.style}
     >
-      <Card className="shadow-2xl border-t-4 border-blue-500 rounded-t-lg rounded-b-none">
+      <Card className={cn(
+        "shadow-2xl border-t-4 border-blue-500 rounded-t-lg",
+        isMobile ? "rounded-lg" : "rounded-b-none"
+      )}>
         {/* Header clickeable para minimizar/maximizar */}
         <CardHeader 
-          className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 cursor-pointer rounded-t-lg"
+          className={cn(
+            "bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 cursor-pointer",
+            isMobile ? "rounded-t-lg" : "rounded-t-lg"
+          )}
           onClick={onToggleMinimize}
         >
           <div className="flex items-center justify-between">
@@ -174,35 +195,42 @@ export function FloatingChatWindow({
             </div>
             
             <div className="flex items-center space-x-1">
+              {!isMobile && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-white hover:bg-white/20"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleMinimize()
+                  }}
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0 text-white hover:bg-white/20"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onToggleMinimize()
-                }}
-              >
-                <Minimize2 className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 text-white hover:bg-white/20"
+                className="h-8 w-8 p-0 text-white hover:bg-white/20"
                 onClick={(e) => {
                   e.stopPropagation()
                   onClose()
                 }}
               >
-                <X className="h-3 w-3" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardHeader>
 
-        {/* Contenido del chat (se oculta cuando está minimizado) */}
-        {!isMinimized && (
-          <CardContent className="p-0 flex flex-col" style={{ height: '400px' }}>
+        {/* Contenido del chat (se oculta cuando está minimizado en desktop) */}
+        {(!isMinimized || isMobile) && (
+          <CardContent 
+            className="p-0 flex flex-col" 
+            style={{ 
+              height: isMobile ? 'calc(70vh - 120px)' : '400px' 
+            }}
+          >
             {/* Área de mensajes */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50">
               {isLoading ? (
@@ -265,13 +293,19 @@ export function FloatingChatWindow({
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Escribe un mensaje..."
                   disabled={isSending || !isConnected}
-                  className="flex-1 text-sm"
+                  className={cn(
+                    "flex-1 text-sm",
+                    isMobile ? "min-h-[44px]" : ""
+                  )}
                 />
                 <Button
                   type="submit"
                   disabled={!newMessage.trim() || isSending || !isConnected}
-                  size="sm"
-                  className="bg-blue-500 hover:bg-blue-600"
+                  size={isMobile ? "default" : "sm"}
+                  className={cn(
+                    "bg-blue-500 hover:bg-blue-600",
+                    isMobile ? "min-h-[44px] min-w-[44px]" : ""
+                  )}
                 >
                   {isSending ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
