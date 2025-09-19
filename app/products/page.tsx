@@ -52,23 +52,28 @@ export default function ProductsPage() {
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
         <main className="flex-1 overflow-auto">
-          <div className="p-8">
+          {/* Mobile header con botón de menú */}
+          <div className="md:hidden flex items-center justify-between p-4 bg-white border-b">
+            <h1 className="text-lg font-semibold">Productos</h1>
+            <Sidebar />
+          </div>
+          <div className="p-4 md:p-8">
             {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Explorar Productos</h1>
-              <p className="text-gray-600">Encuentra productos para alquilar de otros estudiantes</p>
+            <div className="mb-6 md:mb-8">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Explorar Productos</h1>
+              <p className="text-gray-600 text-sm md:text-base">Encuentra productos para alquilar de otros estudiantes</p>
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-6 rounded-lg shadow-sm mb-8">
-              <div className="flex items-center space-x-4">
+            <div className="bg-white p-4 md:p-6 rounded-lg shadow-sm mb-6 md:mb-8">
+              <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
                     placeholder="Buscar productos..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 min-h-[44px]"
                   />
                 </div>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>

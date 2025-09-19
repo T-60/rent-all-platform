@@ -520,14 +520,19 @@ export default function ProfilePage() {
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
         <main className="flex-1 overflow-auto">
-          <div className="p-8">
+          {/* Mobile header con botón de menú */}
+          <div className="md:hidden flex items-center justify-between p-4 bg-white border-b">
+            <h1 className="text-lg font-semibold">Mi Perfil</h1>
+            <Sidebar />
+          </div>
+          <div className="p-4 md:p-8">
             {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Mi Perfil</h1>
-              <p className="text-gray-600">Gestiona tu información personal y revisa tu historial de alquileres</p>
+            <div className="mb-6 md:mb-8">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Mi Perfil</h1>
+              <p className="text-gray-600 text-sm md:text-base">Gestiona tu información personal y revisa tu historial de alquileres</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
               {/* User Info */}
               <div className="lg:col-span-1">
                 <Card>

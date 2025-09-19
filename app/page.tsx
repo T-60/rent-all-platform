@@ -28,22 +28,22 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="py-20">
+      <section className="py-12 md:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
+          <h1 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6">
             Alquila lo que necesitas,
             <br />
             <span className="text-blue-600">cuando lo necesitas</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+          <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
             La plataforma que conecta estudiantes universitarios para compartir productos de uso ocasional. Ahorra
             dinero y ayuda al medio ambiente.
           </p>
-          <div className="space-x-4">
-            <Button size="lg" asChild>
+          <div className="flex flex-col sm:flex-row gap-4 sm:space-x-4 justify-center items-center">
+            <Button size="lg" asChild className="w-full sm:w-auto min-h-[44px]">
               <Link href="/auth">Comenzar Ahora</Link>
             </Button>
-            <Button size="lg" variant="outline" asChild>
+            <Button size="lg" variant="outline" asChild className="w-full sm:w-auto min-h-[44px]">
               <Link href="/auth">Explorar Productos</Link>
             </Button>
           </div>
